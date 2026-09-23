@@ -7,6 +7,7 @@ CrossDiTo 1.5.2 rebases the fork onto **CrossInk 1.6.0**. All upstream 1.5.1 and
 - CrossInk 1.5.1 / 1.6.0 upstream features: X4 Classic support, full X4 Pro touch menu, decimal book-progress precision, stable-page and keypad jumps, file rename in the browser, per-build UI language selection, publisher page numbers, and all upstream stability fixes.
 - Return to Previous Reading Position after deliberate reader-menu jumps (one-shot, back to the page you jumped from).
 - Build-level X4 Pro power policy carried over from CrossDiTo 1.5.1: dynamic CPU frequency scaling, tickless light sleep, USB-plug light-sleep wake tuning, and GT911 touch-wake interrupt gating.
+- The development device simulator now runs natively on Windows (MinGW/MSYS2) and Linux hosts alongside macOS; Windows relies on the reapplyable `scripts/patch_simulator_libdeps_windows.py` libdeps patch.
 
 ### Changed
 
@@ -17,6 +18,10 @@ CrossDiTo 1.5.2 rebases the fork onto **CrossInk 1.6.0**. All upstream 1.5.1 and
 ### Removed
 
 - CrossDiTo 1.5.1 internals that duplicated upstream 1.6 systems: compiled chapter-event cache, retained-next-page prefetch, whole-book pagination display, and the 1.5.0-era reader pipelines. These need re-engineering on the new base and are tracked as follow-up work.
+
+### Fixed
+
+- The native simulator now builds on Linux hosts: the narrowing suppression flag gained its GCC spelling alongside the Clang one, a new `scripts/sim_native_host_compat.py` pre-script pins C libdeps to gnu17 (GCC 15 defaults to C23, breaking QRCode's own `bool` typedef) and links libcrypto for the Linux MD5Builder, and stale Windows-patched simulator libdeps must be re-downloaded (`rm -rf .pio/libdeps/x4-pro-simulator`).
 
 
 ## [v1.5.1] - 2026-08-19
