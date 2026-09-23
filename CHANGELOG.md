@@ -1,3 +1,23 @@
+## [v1.5.2] - 2026-09-24
+
+CrossDiTo 1.5.2 rebases the fork onto **CrossInk 1.6.0**. All upstream 1.5.1 and 1.6.0 fixes and features are inherited; CrossDiTo-specific behavior is re-verified against the new base.
+
+### Added
+
+- CrossInk 1.5.1 / 1.6.0 upstream features: X4 Classic support, full X4 Pro touch menu, decimal book-progress precision, stable-page and keypad jumps, file rename in the browser, per-build UI language selection, publisher page numbers, and all upstream stability fixes.
+- Return to Previous Reading Position after deliberate reader-menu jumps (one-shot, back to the page you jumped from).
+- Build-level X4 Pro power policy carried over from CrossDiTo 1.5.1: dynamic CPU frequency scaling, tickless light sleep, USB-plug light-sleep wake tuning, and GT911 touch-wake interrupt gating.
+
+### Changed
+
+- Frontlight behavior now follows upstream CrossInk (the CrossDiTo 10-bit low-brightness PWM experiment is intentionally not carried over).
+- KOReader Sync entry opens KOReader settings first when no credentials are configured (matches upstream behavior).
+- i18n catalogs merge CrossDiTo strings with all upstream 1.6 languages.
+
+### Removed
+
+- CrossDiTo 1.5.1 internals that duplicated upstream 1.6 systems: compiled chapter-event cache, retained-next-page prefetch, whole-book pagination display, and the 1.5.0-era reader pipelines. These need re-engineering on the new base and are tracked as follow-up work.
+
 
 ## [v1.5.0] - 2026-08-08
 

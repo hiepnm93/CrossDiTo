@@ -2393,6 +2393,7 @@ void EpubReaderActivity::openReaderMenu() {
   }
   const int bookProgressPercent = clampPercent(static_cast<int>(bookProgress + 0.5f));
 
+  if (section) pendingMenuOrigin = SavedPosition{currentSpineIndex, section->currentPage};
   pauseReadingPaceTimer("reader_menu");
   const BookReaderSettingsData bookSettings = loadBookReaderSettingsFile(epub->getCachePath());
   std::unique_ptr<Activity> menuActivity;
@@ -2430,7 +2431,8 @@ void EpubReaderActivity::openReaderMenu() {
         saveReaderOptionsForBook, this, saveGlobalSettingsForBookReader, this, beginGlobalSettingsEditForBookReader,
         this, stableCurrentPage, stablePageCount, endGlobalSettingsEditForBookReader, this,
         bookSettings.dictionarySdFontFamilyName, bookSettings.dictionaryFontPointSize,
-        bookSettings.hasDictionaryFontOverride, saveDictionaryFontForBookReader, this);
+        bookSettings.hasDictionaryFontOverride, saveDictionaryFontForBookReader, this,
+        hasPreviousReadingPosition());
     if (!menuActivity) {
       LOG_ERR("ERS", "Could not allocate reader menu");
       resumeReadingPaceTimer("reader_menu_oom");
@@ -2494,7 +2496,9 @@ void EpubReaderActivity::openReaderMenu() {
       section.reset();  // Force re-layout with changed reader settings
     }
     resumeReadingPaceTimer("reader_menu_return");
+    if (result.isCancelled) pendingMenuOrigin.reset();
     if (!result.isCancelled) {
+      rememberPendingMenuOrigin();
       if (menu->action == static_cast<int>(EpubReaderMenuAction::GO_TO_PERCENT) && menu->drawerValue >= 0) {
         // The touch drawer's Percent pane reports centipercent (see EpubReaderTouchMenuActivity::percent).
         jumpToPercent(static_cast<float>(menu->drawerValue) / 100.0f);
@@ -3861,6 +3865,9 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       requestUpdate();
       break;
     }
+    case EpubReaderMenuActivity::MenuAction::RETURN_TO_PREVIOUS_POSITION:
+      returnToPreviousReadingPosition();
+      break;
     case EpubReaderMenuActivity::MenuAction::SYNC: {
       if (!KOREADER_STORE.hasCredentials()) {
         pauseReadingPaceTimer("koreader_settings");
@@ -7672,6 +7679,77 @@ void EpubReaderActivity::navigateToHref(const std::string& hrefStr, const bool s
     section.reset();
   }
   armReadingPaceWarmup(saveReturnPosition ? "href_navigation" : "chapter_link_navigation");
+  requestUpdate();
+}
+
+bool EpubReaderActivity::hasPreviousReadingPosition() const {
+  return footnoteDepth > 0 || previousReadingPosition.has_value();
+}
+
+void EpubReaderActivity::rememberPendingMenuOrigin() {
+  if (!pendingMenuOrigin) return;
+
+  previousReadingPosition = pendingMenuOrigin;
+  LOG_DBG("ERS", "Stored previous reading position: spine=%d page=%d", previousReadingPosition->spineIndex,
+          previousReadingPosition->pageNumber);
+  pendingMenuOrigin.reset();
+}
+
+void EpubReaderActivity::resetPendingNavigationForJump() {
+  clearFootnotePreviewState();
+  pendingAnchor.clear();
+  pendingPageJump.reset();
+  pendingPercentJump = false;
+  pendingSpineProgress = 0.0f;
+  pendingParagraphIndex = UINT16_MAX;
+  pendingClippingIndex = UINT16_MAX;
+
+  // A menu can change layout settings and then select a jump. In that case the
+  // old relayout target must not override the explicit destination.
+  pendingRelayoutReposition = false;
+  cachedVisibleTextOffset.reset();
+  cachedChapterPageWatermark = 0;
+  cachedPageParagraphIndex = UINT16_MAX;
+  cachedPageParagraphOffset = 0;
+  cachedPageParagraphSpan = 0;
+}
+
+void EpubReaderActivity::returnToPreviousReadingPosition() {
+  pendingMenuOrigin.reset();
+
+  if (footnoteDepth > 0) {
+    const auto& position = savedPositions[footnoteDepth - 1];
+    LOG_DBG("ERS", "Returning to previous reading position: spine=%d page=%d", position.spineIndex, position.pageNumber);
+    pauseReadingPaceTimer("previous_position_return");
+    restoreSavedPosition();
+    return;
+  }
+
+  if (!previousReadingPosition) {
+    requestUpdate();
+    return;
+  }
+
+  const SavedPosition position = *previousReadingPosition;
+  previousReadingPosition.reset();
+  if (!epub || position.spineIndex < 0 || position.spineIndex >= epub->getSpineItemsCount()) {
+    LOG_ERR("ERS", "Discarding invalid previous reading position: spine=%d page=%d", position.spineIndex,
+            position.pageNumber);
+    requestUpdate();
+    return;
+  }
+
+  LOG_DBG("ERS", "Returning to previous reading position: spine=%d page=%d", position.spineIndex, position.pageNumber);
+  pageLoadRetryCount = 0;
+  pauseReadingPaceTimer("previous_position_return");
+  {
+    RenderLock lock(*this);
+    resetPendingNavigationForJump();
+    currentSpineIndex = position.spineIndex;
+    nextPageNumber = std::max(0, position.pageNumber);
+    resetSection();
+  }
+  armReadingPaceWarmup("previous_position_return");
   requestUpdate();
 }
 

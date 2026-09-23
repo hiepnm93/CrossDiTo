@@ -6,6 +6,7 @@
 
 enum class EpubReaderMenuAction : uint8_t {
   SELECT_CHAPTER,
+  RETURN_TO_PREVIOUS_POSITION,
   FOOTNOTES,
   GO_TO_PERCENT,
   GO_TO_STABLE_PAGE,

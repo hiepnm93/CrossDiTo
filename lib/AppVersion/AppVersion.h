@@ -13,7 +13,7 @@
 #endif
 
 #ifndef CROSSDITO_UPSTREAM_VERSION
-#define CROSSDITO_UPSTREAM_VERSION "1.5.0"
+#define CROSSDITO_UPSTREAM_VERSION "1.6.0"
 #endif
 
 // PlatformIO normally supplies these through build_flags/extra_scripts. Keep

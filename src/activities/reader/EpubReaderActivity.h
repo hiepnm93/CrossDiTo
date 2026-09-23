@@ -262,6 +262,10 @@ class EpubReaderActivity final : public Activity {
   static constexpr int MAX_FOOTNOTE_DEPTH = 3;
   SavedPosition savedPositions[MAX_FOOTNOTE_DEPTH] = {};
   int footnoteDepth = 0;
+  // One transient return point for deliberate reader-menu jumps. Keeping both
+  // the saved point and the menu candidate inline avoids persistence and heap churn.
+  std::optional<SavedPosition> previousReadingPosition;
+  std::optional<SavedPosition> pendingMenuOrigin;
 
   // Viewport of the last render(), captured so loop()'s lazy partial-extension start
   // builds with identical layout parameters to the pages already rendered.
@@ -466,6 +470,10 @@ class EpubReaderActivity final : public Activity {
   // Footnote navigation
   void navigateToHref(const std::string& href, bool savePosition = false, bool preferFootnotePreview = false);
   void restoreSavedPosition();
+  bool hasPreviousReadingPosition() const;
+  void rememberPendingMenuOrigin();
+  void resetPendingNavigationForJump();
+  void returnToPreviousReadingPosition();
 
  public:
   explicit EpubReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::unique_ptr<Epub> epub,
