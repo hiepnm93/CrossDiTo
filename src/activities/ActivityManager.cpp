@@ -223,35 +223,20 @@ bool applyTwoFingerRotation(Activity& activity, MappedInputManager& mappedInput)
 }
 }  // namespace
 
-bool ActivityManager::begin(const uint32_t renderTaskStackBytes) {
-  if (!renderingMutex) {
-    renderingMutex = xSemaphoreCreateMutex();
-    if (!renderingMutex) {
-      LOG_ERR("ACT", "Failed to create rendering mutex");
-      return false;
-    }
-  }
-
+void ActivityManager::begin(const uint32_t renderTaskStackBytes) {
 #if defined(configNUM_CORES) && configNUM_CORES > 1
   constexpr BaseType_t renderTaskCore = 1;
 #else
   constexpr BaseType_t renderTaskCore = 0;
 #endif
-  const BaseType_t taskResult = xTaskCreatePinnedToCore(
-      &renderTaskTrampoline, "ActivityManagerRender", renderTaskStackBytes,
-      this,               // Parameters
-      1,                  // Priority
-      &renderTaskHandle,  // Task handle
-      renderTaskCore      // Keep long renders/cover decodes off CPU 0's idle watchdog when available
+  xTaskCreatePinnedToCore(&renderTaskTrampoline, "ActivityManagerRender", renderTaskStackBytes,
+                          this,               // Parameters
+                          1,                  // Priority
+                          &renderTaskHandle,  // Task handle
+                          renderTaskCore  // Keep long renders/cover decodes off CPU 0's idle watchdog when available
   );
-  if (taskResult != pdPASS || !renderTaskHandle) {
-    renderTaskHandle = nullptr;
-    LOG_ERR("ACT", "Failed to create %lu-byte render task (free=%u maxAlloc=%u)",
-            static_cast<unsigned long>(renderTaskStackBytes), ESP.getFreeHeap(), ESP.getMaxAllocHeap());
-    return false;
-  }
+  assert(renderTaskHandle != nullptr && "Failed to create render task");
   LOG_DBG("ACT", "Render task started with %lu-byte stack", static_cast<unsigned long>(renderTaskStackBytes));
-  return true;
 }
 
 void ActivityManager::renderTaskTrampoline(void* param) {
@@ -284,12 +269,6 @@ void ActivityManager::renderTaskLoop() {
     taskEXIT_CRITICAL(&renderStateMux);
     if (waiter) {
       xTaskNotify(waiter, 1, eIncrement);
-    }
-
-    const uint32_t freeStack = uxTaskGetStackHighWaterMark(nullptr);
-    if (freeStack < renderTaskMinFreeStack) {
-      renderTaskMinFreeStack = freeStack;
-      LOG_DBG("ACT", "Render task minimum free stack: %u bytes", static_cast<unsigned>(freeStack));
     }
   }
 }
@@ -366,7 +345,7 @@ void ActivityManager::loop() {
       exitActivity(lock);
       pendingAction = PendingAction::None;
 
-      if (stackedActivityCount == 0) {
+      if (stackActivities.empty()) {
         lock.unlock();  // goHome may acquire its own lock
         goHome();
         continue;  // Will launch goHome immediately
@@ -420,20 +399,13 @@ void ActivityManager::loop() {
         // Destroy the current activity
         exitActivity(lock);
         // Clear the stack
-        while (stackedActivityCount > 0) {
-          auto& stacked = stackActivities[--stackedActivityCount];
-          stacked->onExit();
-          stacked.reset();
+        while (!stackActivities.empty()) {
+          stackActivities.back()->onExit();
+          stackActivities.pop_back();
         }
       } else if (pendingAction == PendingAction::Push) {
-        if (stackedActivityCount >= stackActivities.size()) {
-          LOG_ERR("ACT", "Activity stack is full; dropping %s", pendingActivity->name.c_str());
-          pendingActivity.reset();
-          pendingAction = PendingAction::None;
-          continue;
-        }
         // Move current activity to stack
-        stackActivities[stackedActivityCount++] = std::move(currentActivity);
+        stackActivities.push_back(std::move(currentActivity));
       }
       pendingAction = PendingAction::None;
       currentActivity = std::move(pendingActivity);
@@ -486,7 +458,7 @@ void ActivityManager::loop() {
 
   if (APP_STATE.hasPendingAlert.load(std::memory_order_acquire) && pendingAction == PendingAction::None) {
     APP_STATE.hasPendingAlert.store(false, std::memory_order_relaxed);
-    pushActivity(makeUniqueNoThrow<AlertActivity>(renderer, mappedInput));
+    pushActivity(std::make_unique<AlertActivity>(renderer, mappedInput));
   }
 
   if (requestedUpdate.exchange(false)) {
@@ -588,11 +560,6 @@ void ActivityManager::exitActivity(const RenderLock& lock) {
 
 void ActivityManager::replaceActivity(std::unique_ptr<Activity>&& newActivity) {
   // Note: no lock here, this is usually called by loop() and we may run into deadlock
-  if (!newActivity) {
-    LOG_ERR("ACT", "OOM: activity replacement allocation failed (free=%u maxAlloc=%u)", ESP.getFreeHeap(),
-            ESP.getMaxAllocHeap());
-    return;
-  }
   if (currentActivity) {
     TouchRegistry::getInstance().clear();
     // Defer launch if we're currently in an activity, to avoid deleting the current activity
@@ -608,7 +575,7 @@ void ActivityManager::replaceActivity(std::unique_ptr<Activity>&& newActivity) {
 }
 
 void ActivityManager::goToFileTransfer(std::string returnBookPath) {
-  replaceActivity(makeUniqueNoThrow<CrossPointWebServerActivity>(renderer, mappedInput, std::move(returnBookPath)));
+  replaceActivity(std::make_unique<CrossPointWebServerActivity>(renderer, mappedInput, std::move(returnBookPath)));
 }
 
 bool ActivityManager::goToNearbyBookSend(std::string path, const bool returnToReader) {
@@ -688,7 +655,7 @@ bool ActivityManager::resumeFileTransferFromNetworkBoot(const uint32_t payload) 
 }
 
 void ActivityManager::goToNearbyStatsSync() {
-  replaceActivity(makeUniqueNoThrow<NearbyStatsSyncActivity>(renderer, mappedInput));
+  replaceActivity(std::make_unique<NearbyStatsSyncActivity>(renderer, mappedInput));
 }
 
 void ActivityManager::goToSettings(const bool dismissOnUpSwipe) {
@@ -705,14 +672,14 @@ void ActivityManager::goToSettings(const bool dismissOnUpSwipe) {
 }
 
 void ActivityManager::goToFileBrowser(std::string path) {
-  replaceActivity(makeUniqueNoThrow<FileBrowserActivity>(renderer, mappedInput, std::move(path)));
+  replaceActivity(std::make_unique<FileBrowserActivity>(renderer, mappedInput, std::move(path)));
 }
 
 void ActivityManager::goToRecentBooks() {
   if (SETTINGS.recentBooksView == CrossPointSettings::RECENT_BOOKS_GRID) {
-    replaceActivity(makeUniqueNoThrow<RecentBooksGridActivity>(renderer, mappedInput));
+    replaceActivity(std::make_unique<RecentBooksGridActivity>(renderer, mappedInput));
   } else {
-    replaceActivity(makeUniqueNoThrow<RecentBooksActivity>(renderer, mappedInput));
+    replaceActivity(std::make_unique<RecentBooksActivity>(renderer, mappedInput));
   }
 }
 
@@ -722,7 +689,7 @@ void ActivityManager::goToBrowser() {
   if (servers.size() == 1) {
     goToOpdsServer(0);
   } else {
-    replaceActivity(makeUniqueNoThrow<OpdsServerListActivity>(renderer, mappedInput, true));
+    replaceActivity(std::make_unique<OpdsServerListActivity>(renderer, mappedInput, true));
   }
 }
 
@@ -761,8 +728,8 @@ void ActivityManager::goToReader(std::string path, const bool suppressBackReleas
   // OPDS credentials are unrelated to local reading and may contain several
   // heap-backed strings. Home reloads them lazily when it becomes active.
   OPDS_STORE.release();
-  replaceActivity(makeUniqueNoThrow<ReaderActivity>(renderer, mappedInput, std::move(path), suppressBackRelease,
-                                                    allowFastInitialRefresh, cleanImageBaseOnEntry));
+  replaceActivity(std::make_unique<ReaderActivity>(renderer, mappedInput, std::move(path), suppressBackRelease,
+                                                   allowFastInitialRefresh, cleanImageBaseOnEntry));
 }
 
 void ActivityManager::goToReaderAndRunMenuAction(std::string path, const uint8_t action) {
@@ -773,15 +740,15 @@ void ActivityManager::goToReaderAndRunMenuAction(std::string path, const uint8_t
 void ActivityManager::goToSleep(bool fromTimeout) {
   const bool canSnapshotOverlay = currentActivity && currentActivity->canSnapshotForSleepOverlay();
   const GfxRenderer::Orientation sleepPopupOrientation = renderer.getOrientation();
-  replaceActivity(makeUniqueNoThrow<SleepActivity>(renderer, mappedInput, canSnapshotOverlay, getCurrentBookPath(),
-                                                   fromTimeout, sleepPopupOrientation));
+  replaceActivity(std::make_unique<SleepActivity>(renderer, mappedInput, canSnapshotOverlay, getCurrentBookPath(),
+                                                  fromTimeout, sleepPopupOrientation));
   loop();  // Important: sleep screen must be rendered immediately, the caller will go to sleep right after this returns
 }
 
-void ActivityManager::goToBoot() { replaceActivity(makeUniqueNoThrow<BootActivity>(renderer, mappedInput)); }
+void ActivityManager::goToBoot() { replaceActivity(std::make_unique<BootActivity>(renderer, mappedInput)); }
 
 void ActivityManager::goToFullScreenMessage(std::string message, EpdFontFamily::Style style) {
-  replaceActivity(makeUniqueNoThrow<FullScreenMessageActivity>(renderer, mappedInput, std::move(message), style));
+  replaceActivity(std::make_unique<FullScreenMessageActivity>(renderer, mappedInput, std::move(message), style));
 }
 
 void ActivityManager::goHome(HomeMenuItem initialMenuItem, const HalDisplay::RefreshMode initialRefreshMode) {
@@ -811,26 +778,17 @@ void ActivityManager::goHome(HomeMenuItem initialMenuItem, const HalDisplay::Ref
   replaceActivity(std::make_unique<HomeActivity>(renderer, mappedInput, initialMenuItem, initialRefreshMode,
                                                  std::move(initialBookPath)));
 }
-void ActivityManager::goToCrashReport() { replaceActivity(makeUniqueNoThrow<CrashActivity>(renderer, mappedInput)); }
+void ActivityManager::goToCrashReport() { replaceActivity(std::make_unique<CrashActivity>(renderer, mappedInput)); }
 
-bool ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {
-  if (!activity) {
-    LOG_ERR("ACT", "OOM: child activity allocation failed (free=%u maxAlloc=%u)", ESP.getFreeHeap(),
-            ESP.getMaxAllocHeap());
-    return false;
-  }
-  if (stackedActivityCount >= stackActivities.size()) {
-    LOG_ERR("ACT", "Activity stack is full; unable to open %s", activity->name.c_str());
-    return false;
-  }
-  if (pendingAction != PendingAction::None) {
-    LOG_ERR("ACT", "Activity transition already pending; unable to open %s", activity->name.c_str());
-    return false;
+void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {
+  if (pendingActivity) {
+    // Should never happen in practice
+    LOG_ERR("ACT", "pendingActivity while pushActivity is not expected");
+    pendingActivity.reset();
   }
   TouchRegistry::getInstance().clear();
   pendingActivity = std::move(activity);
   pendingAction = PendingAction::Push;
-  return true;
 }
 
 void ActivityManager::popActivity() {
@@ -858,7 +816,7 @@ bool ActivityManager::isReaderActivity() const {
     return true;
   }
 
-  return std::any_of(stackActivities.begin(), stackActivities.begin() + stackedActivityCount,
+  return std::any_of(stackActivities.begin(), stackActivities.end(),
                      [](const auto& activity) { return activity && activity->isReaderActivity(); });
 }
 
@@ -881,7 +839,7 @@ bool ActivityManager::hasActivityNamed(const char* activityName) const {
     return true;
   }
 
-  return std::any_of(stackActivities.begin(), stackActivities.begin() + stackedActivityCount, matches);
+  return std::any_of(stackActivities.begin(), stackActivities.end(), matches);
 }
 
 #ifdef SIMULATOR
@@ -940,10 +898,6 @@ void ActivityManager::endGlobalSettingsEdit() {
 
 bool ActivityManager::skipLoopDelay() const { return currentActivity && currentActivity->skipLoopDelay(); }
 
-unsigned long ActivityManager::nextLoopWakeDelayMs() const {
-  return currentActivity ? currentActivity->nextLoopWakeDelayMs() : 250UL;
-}
-
 std::string ActivityManager::getCurrentBookPath() const {
   if (currentActivity) {
     const std::string path = currentActivity->getCurrentBookPath();
@@ -952,9 +906,9 @@ std::string ActivityManager::getCurrentBookPath() const {
     }
   }
 
-  for (size_t i = stackedActivityCount; i > 0; --i) {
-    if (stackActivities[i - 1]) {
-      const std::string path = stackActivities[i - 1]->getCurrentBookPath();
+  for (auto it = stackActivities.rbegin(); it != stackActivities.rend(); ++it) {
+    if (*it) {
+      const std::string path = (*it)->getCurrentBookPath();
       if (!path.empty()) {
         return path;
       }
@@ -974,9 +928,9 @@ ScreenshotInfo ActivityManager::getScreenshotInfo() const {
 
   // Reader overlays such as the dictionary are pushed above the book activity.
   // Keep their visible framebuffer, but inherit the book's screenshot filename.
-  for (size_t i = stackedActivityCount; i > 0; --i) {
-    if (stackActivities[i - 1]) {
-      const ScreenshotInfo info = stackActivities[i - 1]->getScreenshotInfo();
+  for (auto it = stackActivities.rbegin(); it != stackActivities.rend(); ++it) {
+    if (*it) {
+      const ScreenshotInfo info = (*it)->getScreenshotInfo();
       if (info.readerType != ScreenshotInfo::ReaderType::None) {
         return info;
       }
@@ -1030,10 +984,6 @@ RequestUpdateResult ActivityManager::requestUpdateAndWait() {
     return RequestUpdateResult::Rejected;
   }
 
-  // This synchronous paint includes every state change that led to an older
-  // deferred request. Consume that request before notifying the render task;
-  // a genuinely new request made while we wait remains set for loop() to send.
-  requestedUpdate.store(false, std::memory_order_release);
   xTaskNotify(renderTaskHandle, 1, eIncrement);
   ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
   return RequestUpdateResult::Rendered;
@@ -1042,19 +992,11 @@ RequestUpdateResult ActivityManager::requestUpdateAndWait() {
 // RenderLock
 
 RenderLock::RenderLock() {
-  if (!activityManager.renderingMutex) {
-    LOG_ERR("ACT", "Rendering mutex is unavailable");
-    return;
-  }
   xSemaphoreTake(activityManager.renderingMutex, portMAX_DELAY);
   isLocked = true;
 }
 
 RenderLock::RenderLock([[maybe_unused]] Activity&) {
-  if (!activityManager.renderingMutex) {
-    LOG_ERR("ACT", "Rendering mutex is unavailable");
-    return;
-  }
   xSemaphoreTake(activityManager.renderingMutex, portMAX_DELAY);
   isLocked = true;
 }
@@ -1080,6 +1022,4 @@ void RenderLock::unlock() {
  *
  * @note Must not be called from ISR context — xSemaphoreGetMutexHolder is not ISR-safe.
  */
-bool RenderLock::peek() {
-  return activityManager.renderingMutex && xSemaphoreGetMutexHolder(activityManager.renderingMutex) != nullptr;
-}
+bool RenderLock::peek() { return xSemaphoreGetMutexHolder(activityManager.renderingMutex) != nullptr; }

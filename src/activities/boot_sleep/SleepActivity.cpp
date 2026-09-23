@@ -102,12 +102,7 @@ struct PngOverlayCtx {
 
 // PNGdec file I/O callbacks — mirror the pattern in PngToFramebufferConverter.cpp.
 void* pngSleepOpen(const char* filename, int32_t* size) {
-  // PNGdec owns this callback handle until pngSleepClose() releases it.
-  FsFile* f = new (std::nothrow) FsFile();
-  if (!f) {
-    LOG_ERR("SLP", "Failed to allocate PNG overlay file handle for %s", filename);
-    return nullptr;
-  }
+  FsFile* f = new FsFile();
   if (!Storage.openFileForRead("SLP", std::string(filename), *f)) {
     delete f;
     return nullptr;
