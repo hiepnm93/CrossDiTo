@@ -211,13 +211,6 @@ std::string formatSettingValue(const SettingInfo& setting) {
   if (setting.valuePtr == &CrossPointSettings::clockUtcOffsetQ) {
     return formatUtcOffset(SETTINGS.*(setting.valuePtr));
   }
-  if (setting.valuePtr == &CrossPointSettings::frontlightScheduleStartQ ||
-      setting.valuePtr == &CrossPointSettings::frontlightScheduleEndQ) {
-    char valueBuffer[9];
-    FrontlightSchedule::formatTimeSlot(SETTINGS.*(setting.valuePtr), SETTINGS.clockFormat == 1, valueBuffer,
-                                       sizeof(valueBuffer));
-    return valueBuffer;
-  }
   return std::to_string(SETTINGS.*(setting.valuePtr));
 }
 
@@ -310,16 +303,6 @@ void SettingsActivity::rebuildSettingsLists() {
   dictionaryRegistry.refreshIfDirty();
   const auto allSettings = getSettingsList(needsFonts ? &sdFontSystem.registry() : nullptr, &dictionaryRegistry);
   displaySettings = buildGroupedDisplaySettingsList(allSettings);
-#if FREEINK_CAP_FRONTLIGHT
-  if (SETTINGS.frontlightScheduleEnabled == 0) {
-    displaySettings.erase(std::remove_if(displaySettings.begin(), displaySettings.end(),
-                                         [](const SettingInfo& setting) {
-                                           return setting.valuePtr == &CrossPointSettings::frontlightScheduleStartQ ||
-                                                  setting.valuePtr == &CrossPointSettings::frontlightScheduleEndQ;
-                                         }),
-                          displaySettings.end());
-  }
-#endif
 #ifndef SIMULATOR
   if (BoardConfig::isX4Pro() || CROSSINK_APP_DEVICE_X4CLASSIC) {
     displaySettings.erase(
@@ -1017,11 +1000,6 @@ void SettingsActivity::toggleCurrentSetting() {
                            });
     return;
   }
-  if (setting.valuePtr == &CrossPointSettings::frontlightScheduleStartQ ||
-      setting.valuePtr == &CrossPointSettings::frontlightScheduleEndQ) {
-    openFrontlightScheduleTimePicker(setting);
-    return;
-  }
   if (setting.type == SettingType::STRING) {
     openStringEditor(setting);
     return;
@@ -1221,32 +1199,6 @@ void SettingsActivity::openSleepTimeoutPicker() {
           SETTINGS.sleepTimeoutMinutes = static_cast<uint8_t>(std::get<IntervalResult>(result.data).value);
           SETTINGS.saveToFile();
         }
-        requestUpdate();
-      });
-}
-
-void SettingsActivity::openFrontlightScheduleTimePicker(const SettingInfo& setting) {
-  if (setting.valuePtr == nullptr) return;
-
-  const auto valuePtr = setting.valuePtr;
-  const char* activityName =
-      valuePtr == &CrossPointSettings::frontlightScheduleStartQ ? "FrontlightScheduleStart" : "FrontlightScheduleEnd";
-  startActivityForResult(
-      makeUniqueNoThrow<IntervalSelectionActivity>(
-          renderer, mappedInput, activityName, setting.nameId, SETTINGS.*valuePtr, 0,
-          CrossPointSettings::FRONTLIGHT_SCHEDULE_SLOT_COUNT - 1, 1, FrontlightSchedule::SLOTS_PER_HOUR,
-          StrId::STR_NONE_OPT, /*readerActivity=*/false, /*allowPowerAsConfirm=*/false,
-          /*ignoreInitialConfirmRelease=*/true, /*showPercentValue=*/false, StrId::STR_NONE_OPT,
-          /*overrideDisabledReaderTouchscreen=*/false, /*showTouchHeaderBackButton=*/true,
-          /*showClockTimeValue=*/true),
-      [this, valuePtr](const ActivityResult& result) {
-        if (!result.isCancelled) {
-          const uint32_t slot = std::get<IntervalResult>(result.data).value;
-          SETTINGS.*valuePtr =
-              static_cast<uint8_t>(std::min<uint32_t>(slot, CrossPointSettings::FRONTLIGHT_SCHEDULE_SLOT_COUNT - 1));
-          SETTINGS.saveToFile();
-        }
-        rebuildSettingsLists();
         requestUpdate();
       });
 }
