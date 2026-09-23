@@ -123,6 +123,17 @@ def get_crossdito_version(project_dir):
             'build version will be "0.0.0"'
         )
         return '0.0.0'
+    return config.get('crossdito', 'version')
+
+
+def get_crossink_version(project_dir):
+    config = _read_ini(project_dir)
+    if not config.has_option('crossink', 'version'):
+        warn(
+            'No [crossink] version in platformio.ini or platformio.local.ini; '
+            'hardware version will be "0.0.0"'
+        )
+        return '0.0.0'
     return config.get('crossink', 'version')
 
 
