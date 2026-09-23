@@ -1841,9 +1841,17 @@ void loop() {
       // Idle: block on the input wake semaphore (tickless light sleep) instead
       // of a plain delay, so any button or touch IRQ resumes the loop at once.
       powerManager.setPowerSaving(true);
+#ifndef SIMULATOR
       gpio.waitForActivity(50);
+#else
+      delay(50);
+#endif
     } else {
+#ifndef SIMULATOR
       gpio.waitForActivity(10);
+#else
+      delay(10);
+#endif
     }
   }
 }

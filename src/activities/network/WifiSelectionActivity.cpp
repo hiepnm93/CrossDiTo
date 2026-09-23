@@ -404,7 +404,7 @@ void WifiSelectionActivity::processWifiScanResults() {
 
     for (int i = 0; i < scanResult; i++) {
       char ssid[33];
-      strlcpy(ssid, WiFi.SSID(i).c_str(), sizeof(ssid));
+      snprintf(ssid, sizeof(ssid), "%s", WiFi.SSID(i).c_str());
       const int32_t rssi = WiFi.RSSI(i);
       const int authMode = WiFi.encryptionType(i);
 

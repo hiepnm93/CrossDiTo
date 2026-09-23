@@ -151,6 +151,10 @@ inline HeapByteBuffer makeAlignedByteBufferNoThrow(const size_t count, const Mem
     void* ptr = nullptr;
     if (::posix_memalign(&ptr, alignment, alignedCount) != 0) return {};
     return HeapByteBuffer(static_cast<uint8_t*>(ptr));
+#elif defined(_WIN32)
+    // MinGW/MSVC have no std::aligned_alloc; malloc already guarantees
+    // max_align_t alignment, and the rounded-up count keeps size parity.
+    return HeapByteBuffer(static_cast<uint8_t*>(std::malloc(alignedCount)));
 #else
     return HeapByteBuffer(static_cast<uint8_t*>(std::aligned_alloc(alignment, alignedCount)));
 #endif

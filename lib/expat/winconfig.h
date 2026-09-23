@@ -42,7 +42,6 @@
 #include <windows.h>
 #undef WIN32_LEAN_AND_MEAN
 
-#include <memory.h>
 #include <string.h>
 
 #endif /* ndef WINCONFIG_H */

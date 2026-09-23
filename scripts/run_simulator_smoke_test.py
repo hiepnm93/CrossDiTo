@@ -40,7 +40,10 @@ THEMES = {
 
 
 def program_path(env_name: str) -> Path:
-    return ROOT / ".pio" / "build" / env_name / "program"
+    program = ROOT / ".pio" / "build" / env_name / "program"
+    if os.name == "nt":
+        program = program.with_suffix(".exe")
+    return program
 
 
 def build_simulator(env_name: str) -> None:
