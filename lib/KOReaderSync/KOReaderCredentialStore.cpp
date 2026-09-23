@@ -43,8 +43,6 @@ bool KOReaderCredentialStore::saveToFile() const {
 
 void KOReaderCredentialStore::toJson(JsonDocument& doc) const {
   doc["cfgVersion"] = CONFIG_VERSION;
-  // Serialize fields directly: public getters lazy-load and saveToFile() already
-  // holds the store mutex. Calling a getter here could recursively load while locked.
   doc["username"] = username;
   doc["password_obf"] = obfuscation::obfuscateToBase64(password);
   doc["serverUrl"] = serverUrl;

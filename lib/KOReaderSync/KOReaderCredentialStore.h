@@ -52,14 +52,8 @@ class KOReaderCredentialStore : public PersistableStore<KOReaderCredentialStore>
 
   // Credential management
   void setCredentials(const std::string& user, const std::string& pass);
-  const std::string& getUsername() const {
-    ensureLoaded();
-    return username;
-  }
-  const std::string& getPassword() const {
-    ensureLoaded();
-    return password;
-  }
+  const std::string& getUsername() const;
+  const std::string& getPassword() const;
 
   // Get MD5 hash of password for API authentication
   std::string getMd5Password() const;
@@ -67,12 +61,12 @@ class KOReaderCredentialStore : public PersistableStore<KOReaderCredentialStore>
   // Check if credentials are set
   bool hasCredentials() const;
 
+  // Clear credentials
+  void clearCredentials();
+
   // Server URL management
   void setServerUrl(const std::string& url);
-  const std::string& getServerUrl() const {
-    ensureLoaded();
-    return serverUrl;
-  }
+  const std::string& getServerUrl() const;
 
   // Get base URL for API calls (with http:// normalization if no protocol, falls back to default)
   std::string getBaseUrl() const;
@@ -82,24 +76,15 @@ class KOReaderCredentialStore : public PersistableStore<KOReaderCredentialStore>
 
   // Document matching method
   void setMatchMethod(DocumentMatchMethod method);
-  DocumentMatchMethod getMatchMethod() const {
-    ensureLoaded();
-    return matchMethod;
-  }
+  DocumentMatchMethod getMatchMethod() const;
 
   // Send metadata setting
   void setSendMetadata(bool enabled);
-  bool getSendMetadata() const {
-    ensureLoaded();
-    return sendMetadata;
-  }
+  bool getSendMetadata() const;
 
   // Sync behavior
   void setSyncBehavior(KOReaderSyncBehavior behavior);
-  KOReaderSyncBehavior getSyncBehavior() const {
-    ensureLoaded();
-    return syncBehavior;
-  }
+  KOReaderSyncBehavior getSyncBehavior() const;
 };
 
 // Helper macro to access credential store
