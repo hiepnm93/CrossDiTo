@@ -25,6 +25,20 @@ import sys
 
 PATCH_DIR = os.path.join(env["PROJECT_DIR"], "scripts", "jpegdec_patches")  # noqa: F821
 
+# git apply must tolerate host-specific checkout quirks so the same patches
+# apply on every dev host:
+#   -c core.filemode=false  -- NTFS/shared mounts mark every file executable,
+#                              while the patches record mode 100644.
+#   --ignore-whitespace     -- patches were authored on a CRLF host; fresh
+#                              Linux libdep checkouts are LF.
+GIT_APPLY_BASE = [
+    "git",
+    "-c",
+    "core.filemode=false",
+    "apply",
+    "--ignore-whitespace",
+]
+
 
 def patch_jpegdec(env):
     libdeps_dir = os.path.join(env["PROJECT_DIR"], ".pio", "libdeps")
@@ -68,7 +82,7 @@ def _apply_one(jpeg_dir, patch_path):
         # Not applied, not appliable -- the libdep source has diverged from
         # what the patch expects. Don't write a half-patched file.
         result = subprocess.run(
-            ["git", "apply", "--check", patch_path],
+            GIT_APPLY_BASE + ["--check", patch_path],
             cwd=jpeg_dir,
             capture_output=True,
             text=True,
@@ -78,7 +92,9 @@ def _apply_one(jpeg_dir, patch_path):
             % (name, result.stdout, result.stderr)
         )
         raise SystemExit(1)
-    subprocess.run(["git", "apply", patch_path], cwd=jpeg_dir, check=True)
+    subprocess.run(
+        GIT_APPLY_BASE + [patch_path], cwd=jpeg_dir, check=True
+    )
     print("Applied JPEGDEC patch: %s" % name)
 
 
@@ -111,7 +127,7 @@ def _patch_already_satisfied(jpeg_dir, patch_name):
 
 
 def _git_apply_succeeds(jpeg_dir, patch_path, *, reverse):
-    cmd = ["git", "apply", "--check"]
+    cmd = GIT_APPLY_BASE + ["--check"]
     if reverse:
         cmd.append("--reverse")
     cmd.append(patch_path)
