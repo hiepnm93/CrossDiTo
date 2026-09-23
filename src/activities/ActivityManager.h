@@ -4,11 +4,11 @@
 #include <freertos/semphr.h>
 #include <freertos/task.h>
 
-#include <array>
 #include <atomic>
-#include <cstdint>
+#include <cassert>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "CrossPointSettings.h"
 #include "GfxRenderer.h"
@@ -49,9 +49,7 @@ class ActivityManager {
  protected:
   GfxRenderer& renderer;
   MappedInputManager& mappedInput;
-  static constexpr size_t MAX_STACKED_ACTIVITIES = 10;
-  std::array<std::unique_ptr<Activity>, MAX_STACKED_ACTIVITIES> stackActivities{};
-  size_t stackedActivityCount = 0;
+  std::vector<std::unique_ptr<Activity>> stackActivities;
   std::unique_ptr<Activity> currentActivity;
 
   void exitActivity(const RenderLock& lock);
@@ -71,7 +69,6 @@ class ActivityManager {
 
   // Task to render and display the activity
   TaskHandle_t renderTaskHandle = nullptr;
-  uint32_t renderTaskMinFreeStack = UINT32_MAX;
   static void renderTaskTrampoline(void* param);
   [[noreturn]] virtual void renderTaskLoop();
 
@@ -98,10 +95,13 @@ class ActivityManager {
 
  public:
   explicit ActivityManager(GfxRenderer& renderer, MappedInputManager& mappedInput)
-      : renderer(renderer), mappedInput(mappedInput) {}
+      : renderer(renderer), mappedInput(mappedInput), renderingMutex(xSemaphoreCreateMutex()) {
+    assert(renderingMutex != nullptr && "Failed to create rendering mutex");
+    stackActivities.reserve(10);
+  }
   ~ActivityManager() { assert(false); /* should never be called */ };
 
-  bool begin(uint32_t renderTaskStackBytes = 16384);
+  void begin(uint32_t renderTaskStackBytes = 16384);
   void loop();
 
   // Will replace currentActivity and drop all activities on stack
@@ -133,9 +133,7 @@ class ActivityManager {
               HalDisplay::RefreshMode initialRefreshMode = HalDisplay::FAST_REFRESH);
 
   // This will move current activity to stack instead of deleting it
-  // Returns false when the child could not be queued (OOM, full stack, or an
-  // already-pending transition), leaving the current activity unchanged.
-  bool pushActivity(std::unique_ptr<Activity>&& activity);
+  void pushActivity(std::unique_ptr<Activity>&& activity);
 
   // Remove the currentActivity, returning the last one on stack
   // Note: if popActivity() on last activity on the stack, we will goHome()
@@ -166,7 +164,6 @@ class ActivityManager {
   void notifyInputLockChanged(bool locked);
   void notifyUserInput();
   bool skipLoopDelay() const;
-  unsigned long nextLoopWakeDelayMs() const;
   std::string getCurrentBookPath() const;
   ScreenshotInfo getScreenshotInfo() const;
 
