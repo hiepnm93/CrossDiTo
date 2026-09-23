@@ -291,8 +291,7 @@ class BaseTheme {
                              const int textYOffset = 0, const bool isPageBookmarked = false,
                              const char* timeLeftLabel = nullptr, bool darkMode = false,
                              float chapterProgressPercent = -1.0f, int stableCurrentPage = 0, int stablePageCount = 0,
-                             bool showProgress = true, bool pageCountEstimated = false,
-                             uint32_t wholeBookCurrentPage = 0, uint32_t wholeBookPageCount = 0) const;
+                             bool showProgress = true, bool pageCountEstimated = false) const;
   virtual void drawTopStatusBarClock(const GfxRenderer& renderer, int topY = -1, const char* previewTime = nullptr,
                                      bool readerContext = true, int textYOffset = 0, bool darkMode = false,
                                      bool forceVisible = false) const;

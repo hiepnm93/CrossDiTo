@@ -1569,6 +1569,8 @@ void setup() {
   allowSleepAt = millis() + 2000;
 }
 
+static bool fatalStartupFailure = false;
+
 void loop() {
   if (fatalStartupFailure) {
     delay(1000);
@@ -1836,40 +1838,12 @@ void loop() {
     yield();                             // Give FreeRTOS a chance to run tasks, but return immediately
   } else {
     if (millis() - lastActivityTime >= HalPowerManager::IDLE_POWER_SAVING_MS) {
-      // Once idle, sleep until the earliest real deadline. Physical buttons
-      // and the touch IRQ signal the semaphore and wake this task immediately.
+      // Idle: block on the input wake semaphore (tickless light sleep) instead
+      // of a plain delay, so any button or touch IRQ resumes the loop at once.
       powerManager.setPowerSaving(true);
-      unsigned long waitMs = activityManager.nextLoopWakeDelayMs();
-      if (waitMs > IDLE_SAFETY_HEARTBEAT_MS) waitMs = IDLE_SAFETY_HEARTBEAT_MS;
-#ifndef SIMULATOR
-      waitMs = gpio.nextInputServiceDelayMs(waitMs);
-#endif
-      waitMs = frontlightScheduleServiceDelayMs(waitMs);
-
-      if (sleepTimeoutMs > 0) {
-        const unsigned long idleElapsed = millis() - lastActivityTime;
-        const unsigned long sleepRemaining = idleElapsed >= sleepTimeoutMs ? 0UL : sleepTimeoutMs - idleElapsed;
-        if (sleepRemaining < waitMs) waitMs = sleepRemaining;
-      }
-
-      // USB transfer has no input-semaphore edge, and enabled tilt gestures
-      // are deliberately sampled at 20 Hz.
-      if (gpio.isUsbConnected() && waitMs > 50UL) waitMs = 50UL;
-      if (SETTINGS.tiltPageTurn && activityManager.isReaderActivity() && halTiltSensor.isAvailable() && waitMs > 50UL) {
-        waitMs = 50UL;
-      }
-#ifdef SIMULATOR
-      delay(waitMs);
-#else
-      gpio.waitForActivity(waitMs);
-#endif
+      gpio.waitForActivity(50);
     } else {
-      // Short delay to prevent tight loop while still being responsive
-#ifdef SIMULATOR
-      delay(10);
-#else
       gpio.waitForActivity(10);
-#endif
     }
   }
 }
