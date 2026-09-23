@@ -1,5 +1,6 @@
 #pragma once
 #include <Logging.h>
+#include <Memory.h>
 
 #include <cassert>
 #include <cstdint>
@@ -54,6 +55,9 @@ class Activity {
   virtual RequestUpdateResult requestUpdateAndWait();
 
   virtual bool skipLoopDelay() { return false; }
+  // Maximum idle time before loop() needs another timer tick. GPIO edges wake
+  // the task earlier; activities with tighter timers can return less.
+  virtual unsigned long nextLoopWakeDelayMs() const { return 250UL; }
   virtual bool preventAutoSleep() { return false; }
   // While true, main-loop global controls and activity replacement are
   // suspended so an exclusive storage owner cannot race the filesystem.

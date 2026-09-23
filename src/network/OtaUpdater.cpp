@@ -27,18 +27,23 @@ OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback, void*, s
 #include "network/WifiPowerSaveGuard.h"
 
 namespace {
-#ifndef CROSSINK_OTA_RELEASE_URL
-#define CROSSINK_OTA_RELEASE_URL "https://api.github.com/repos/uxjulia/CrossInk/releases/latest"
+#ifndef CROSSDITO_OTA_RELEASE_URL
+#ifdef CROSSINK_OTA_RELEASE_URL
+// Honor existing local build overrides after the product rename.
+#define CROSSDITO_OTA_RELEASE_URL CROSSINK_OTA_RELEASE_URL
+#else
+#define CROSSDITO_OTA_RELEASE_URL "https://api.github.com/repos/uxjulia/CrossInk/releases/latest"
+#endif
 #endif
 
-constexpr char latestReleaseUrl[] = CROSSINK_OTA_RELEASE_URL;
+constexpr char latestReleaseUrl[] = CROSSDITO_OTA_RELEASE_URL;
 
 #ifdef CROSSINK_FIRMWARE_DEVICE_TYPE
-constexpr char firmwareAssetStem[] = "firmware-" CROSSINK_FIRMWARE_DEVICE_TYPE;
-constexpr char firmwareAssetName[] = "firmware-" CROSSINK_FIRMWARE_DEVICE_TYPE ".bin";
+constexpr char firmwareAssetStem[] = CROSSDITO_PRODUCT_NAME "-" CROSSINK_FIRMWARE_DEVICE_TYPE;
+constexpr char firmwareAssetName[] = CROSSDITO_PRODUCT_NAME "-" CROSSINK_FIRMWARE_DEVICE_TYPE ".bin";
 #else
-constexpr char firmwareAssetStem[] = "firmware";
-constexpr char firmwareAssetName[] = "firmware.bin";
+constexpr char firmwareAssetStem[] = CROSSDITO_PRODUCT_NAME;
+constexpr char firmwareAssetName[] = CROSSDITO_PRODUCT_NAME ".bin";
 #endif
 
 constexpr char binSuffix[] = ".bin";
@@ -307,7 +312,7 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
     return INTERNAL_UPDATE_ERROR;
   }
 
-  esp_err = esp_http_client_set_header(client_handle, "User-Agent", "CrossInk-ESP32-" CROSSINK_VERSION);
+  esp_err = esp_http_client_set_header(client_handle, "User-Agent", CROSSDITO_HTTP_USER_AGENT);
   if (esp_err != ESP_OK) {
     LOG_ERR("OTA", "esp_http_client_set_header Failed : %s", esp_err_to_name(esp_err));
     esp_http_client_cleanup(client_handle);

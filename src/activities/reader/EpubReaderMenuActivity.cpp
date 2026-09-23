@@ -50,7 +50,12 @@ int readerMenuTabBarHeight(const int baseTabBarHeight, const bool hasTouch) {
 bool readerMenuTabsAtBottom(const MappedInputManager& mappedInput) {
   // Frontlight boards reserve the top-edge down-swipe for the quick panel, so
   // the reader menu opens from the bottom and its tabs should stay thumb-close.
-  return mappedInput.hasTouch() && Frontlight.present();
+  if (mappedInput.hasTouch() && Frontlight.present()) {
+    return ReaderMenuTabLayout{height, topTabY + verticalSpacing, bottomInset + height + verticalSpacing,
+                               safe.y + safe.height - height, true};
+  }
+#endif
+  return ReaderMenuTabLayout{height, topTabY + height + verticalSpacing, bottomInset, topTabY, false};
 }
 #endif
 
@@ -199,7 +204,7 @@ EpubReaderMenuActivity::EpubReaderMenuActivity(
     ReaderOptionsActivity::GlobalSettingsEditCallback endGlobalSettingsEditCallback, void* endGlobalSettingsEditContext,
     const char* dictionaryFontFamilyName, const uint8_t dictionaryFontPointSize, const bool hasDictionaryFontOverride,
     ReaderOptionsActivity::DictionaryFontChangedCallback dictionaryFontChangedCallback,
-    void* dictionaryFontChangedContext)
+    void* dictionaryFontChangedContext, const bool hasPreviousReadingPosition)
     : Activity("EpubReaderMenu", renderer, mappedInput),
       menuItems(buildMenuItems(hasFootnotes, hasBookmarks, hasClippings, isCurrentPageBookmarked, isBookCompleted,
                                showReadingPaceReset, hasDictionary, stablePageCount > 0)),
@@ -239,10 +244,13 @@ EpubReaderMenuActivity::TabMenuItems EpubReaderMenuActivity::buildMenuItems(
   auto& bookmarkItems = items[BOOKMARKS_TAB_INDEX];
   auto& settingsItems = items[SETTINGS_TAB_INDEX];
 
-  mainItems.reserve(9 + (hasFootnotes ? 1u : 0u) + (hasDictionary ? 2u : 0u));
+  mainItems.reserve(9 + (hasFootnotes ? 1u : 0u) + (hasDictionary ? 2u : 0u) + (hasPreviousReadingPosition ? 1u : 0u));
   bookmarkItems.reserve(9 + (hasBookmarks ? 2u : 0u) + (hasClippings ? 1u : 0u));
   settingsItems.reserve(6);
 
+  if (hasPreviousReadingPosition) {
+    mainItems.push_back({MenuAction::RETURN_TO_PREVIOUS_POSITION, StrId::STR_RETURN_TO_PREVIOUS_POSITION});
+  }
   if (hasFootnotes) {
     mainItems.push_back({MenuAction::FOOTNOTES, StrId::STR_FOOTNOTES});
   }
@@ -433,7 +441,7 @@ bool EpubReaderMenuActivity::activateSelectedItem() {
   }
 
   if (selectedAction == MenuAction::VIEW_CLIPPINGS) {
-    startActivityForResult(std::make_unique<EpubReaderClippingListActivity>(renderer, mappedInput),
+    startActivityForResult(makeUniqueNoThrow<EpubReaderClippingListActivity>(renderer, mappedInput),
                            [this](const ActivityResult& result) {
                              if (result.isCancelled) {
                                requestUpdate();
@@ -672,9 +680,9 @@ void EpubReaderMenuActivity::buildMenuScreen(UiApp::ScreenType& screen) {
 #endif
   // The legacy header, progress band, and icon tabs remain outside the app;
   // FreeInkUI owns the scalable list between them.
-  screen.setContentMargin(fui::Insets{static_cast<int16_t>(contentTop),
+  screen.setContentMargin(fui::Insets{static_cast<int16_t>(tabLayout.contentTop),
                                       static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width)),
-                                      static_cast<int16_t>(contentBottom), static_cast<int16_t>(safe.x)});
+                                      static_cast<int16_t>(tabLayout.contentBottom), static_cast<int16_t>(safe.x)});
 
   const auto& activeItems = activeMenuItems();
   std::vector<std::string> values(activeItems.size());

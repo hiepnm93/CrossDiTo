@@ -7,6 +7,7 @@
 #include <SPI.h>
 #include <XteinkDetect.h>
 #include <esp_sleep.h>
+#include <soc/soc_caps.h>
 
 #include <algorithm>
 
@@ -141,6 +142,65 @@ bool detectX3DisplayIsUc8279() {
 
 }  // namespace
 
+#if CROSSPOINT_EMULATED == 0 && CROSSDITO_INPUT_IDLE_WAIT
+void IRAM_ATTR HalGPIO::signalInputWake(void* context) {
+  auto* self = static_cast<HalGPIO*>(context);
+  if (!self || !self->inputWakeSemaphore) return;
+
+  BaseType_t higherPriorityTaskWoken = pdFALSE;
+  xSemaphoreGiveFromISR(self->inputWakeSemaphore, &higherPriorityTaskWoken);
+  if (higherPriorityTaskWoken == pdTRUE) {
+    portYIELD_FROM_ISR();
+  }
+}
+
+void HalGPIO::attachInputWakeInterrupts() {
+  inputWakeSemaphore = xSemaphoreCreateBinaryStatic(&inputWakeSemaphoreStorage);
+  if (!inputWakeSemaphore) {
+    LOG_ERR("GPIO", "Failed to create static input wake semaphore");
+    return;
+  }
+
+  const auto& input = BoardConfig::ACTIVE.input;
+  const int8_t candidates[] = {input.back, input.confirm, input.left,  input.right,
+                               input.up,   input.down,    input.power, BoardConfig::ACTIVE.touch.irq};
+  int8_t attached[sizeof(candidates) / sizeof(candidates[0])] = {};
+  size_t attachedCount = 0;
+  uint64_t activeLowWakeMask = 0;
+
+  for (const int8_t pin : candidates) {
+    if (pin < 0) continue;
+    bool duplicate = false;
+    for (size_t i = 0; i < attachedCount; ++i) {
+      if (attached[i] == pin) {
+        duplicate = true;
+        break;
+      }
+    }
+    if (duplicate) continue;
+
+    attachInterruptArg(static_cast<uint8_t>(pin), &HalGPIO::signalInputWake, this, CHANGE);
+    attached[attachedCount++] = pin;
+
+#if FREEINK_DEVICE_X4PRO
+    // X4 Pro's three physical buttons and GT911 interrupt are active-low RTC
+    // GPIOs. EXT1 lets them wake automatic light sleep without changing their
+    // normal edge-triggered ISR configuration.
+    activeLowWakeMask |= (1ULL << static_cast<uint8_t>(pin));
+#endif
+  }
+
+#if FREEINK_DEVICE_X4PRO && SOC_PM_SUPPORT_EXT1_WAKEUP
+  if (activeLowWakeMask != 0) {
+    const esp_err_t err = esp_sleep_enable_ext1_wakeup_io(activeLowWakeMask, ESP_EXT1_WAKEUP_ANY_LOW);
+    if (err != ESP_OK) {
+      LOG_ERR("GPIO", "Failed to arm input light-sleep wake: %d", static_cast<int>(err));
+    }
+  }
+#endif
+}
+#endif
+
 void HalGPIO::begin() {
 #if FREEINK_DEVICE_X4 || FREEINK_DEVICE_X3
 #ifdef FORCE_DEVICE_X3
@@ -172,6 +232,9 @@ void HalGPIO::begin() {
   }
 #endif
   inputMgr.begin();
+#if CROSSPOINT_EMULATED == 0 && CROSSDITO_INPUT_IDLE_WAIT
+  attachInputWakeInterrupts();
+#endif
 }
 
 void HalGPIO::update() {
@@ -195,6 +258,20 @@ void HalGPIO::update() {
   lastUsbConnected = connected;
   lastUsbPollMs = now;
   usbStateSampled = true;
+}
+
+void HalGPIO::waitForActivity(const unsigned long timeoutMs) {
+#if CROSSPOINT_EMULATED == 0 && CROSSDITO_INPUT_IDLE_WAIT
+  if (inputWakeSemaphore) {
+    xSemaphoreTake(inputWakeSemaphore, pdMS_TO_TICKS(timeoutMs));
+    return;
+  }
+#endif
+  delay(timeoutMs);
+}
+
+unsigned long HalGPIO::nextInputServiceDelayMs(const unsigned long maxDelayMs) const {
+  return inputMgr.nextServiceDelayMs(maxDelayMs);
 }
 
 bool HalGPIO::wasUsbStateChanged() const { return usbStateChanged; }
@@ -262,6 +339,8 @@ bool HalGPIO::wasTouchDown(float& nx, float& ny) const { return inputMgr.wasTouc
 
 bool HalGPIO::wasTouchReleased() const { return inputMgr.wasTouchReleased(); }
 
+void HalGPIO::suppressTouchContact() { inputMgr.suppressTouchContact(); }
+
 bool HalGPIO::isTouchTapCandidate(float& nx, float& ny, unsigned long& heldMs) const {
   return inputMgr.isTouchTapCandidate(nx, ny, heldMs);
 }
@@ -289,11 +368,13 @@ bool HalGPIO::isXteinkDevice() const {
   return BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX3 ||
          BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX3Uc8279 ||
          BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX4 ||
+         BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX4Pro ||
          BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX4Classic;
 }
 
 bool HalGPIO::hasEdgeSideButtons() const {
   return BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX3 ||
+         BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX4Pro ||
          BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX4Pro ||
          BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX4Classic;
 }

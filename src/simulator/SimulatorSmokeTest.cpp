@@ -11,6 +11,7 @@
 #include <memory>
 #include <vector>
 
+#include "CrossInkHalFrontlight.h"
 #include "CrossPointSettings.h"
 #include "DeviceCapabilities.h"
 #include "MappedInputManager.h"
@@ -23,6 +24,7 @@
 #include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
 #include "simulator/SimulatorHomeKeyInput.h"
+#include "util/FrontlightSchedule.h"
 
 extern ActivityManager activityManager;
 extern GfxRenderer renderer;
@@ -360,7 +362,7 @@ class SimulatorSmokeTest {
     }
 
     switch (step) {
-      case SmokeStep::Start:
+      case SmokeStep::Start: {
         LOG_INF("SMOKE", "Starting simulator smoke test");
         if (!CrossPointSettings::verifySleepTimeoutMigrationContract()) {
           fail("Sleep timeout migration contract failed");
@@ -378,6 +380,7 @@ class SimulatorSmokeTest {
         activityManager.goHome();
         queueStep("Home", SmokeStep::Home);
         break;
+      }
 
       case SmokeStep::Home:
         activityManager.goToFileBrowser("/books");
@@ -417,8 +420,8 @@ class SimulatorSmokeTest {
 
       case SmokeStep::ReaderOptions:
         activityManager.replaceActivity(
-            std::make_unique<EpubReaderMenuActivity>(renderer, mappedInputManager, "Smoke Test", 1, 1, 0,
-                                                     SETTINGS.orientation, false, false, false, false, false, false));
+            makeUniqueNoThrow<EpubReaderMenuActivity>(renderer, mappedInputManager, "Smoke Test", 1, 1, 0,
+                                                      SETTINGS.orientation, false, false, false, false, false, false));
         queueStep("Reader Menu", SmokeStep::ReaderMenu);
         break;
 

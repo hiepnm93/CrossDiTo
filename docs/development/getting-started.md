@@ -6,7 +6,7 @@ nav_order: 1
 
 # Getting Started
 
-This guide helps you build and run CrossInk locally.
+This guide helps you build and run CrossDiTo locally.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ This guide helps you build and run CrossInk locally.
 - Python 3.8+
 - `clang-format` 21+ in your `PATH` (CI uses clang-format 21)
 - USB-C cable
-- Xteink X4 or X3 device for hardware testing
+- Xteink X4 Pro for hardware testing
 
 If `./bin/clang-format-fix` fails with either of these errors, install clang-format 21:
 
@@ -46,32 +46,33 @@ clang-format-21 --version
 
 The reported major version must be 21 or newer.
 
-## Clone and initialize
+## Clone
 
 ```sh
-git clone --recursive https://github.com/uxjulia/CrossInk
-cd CrossInk
+git clone https://github.com/dito94/CrossDiTo.git
+cd CrossDiTo
 ```
 
-If you already cloned without submodules:
-
-```sh
-git submodule update --init --recursive
-```
+The hardware SDK used by the verified X4 Pro release is vendored in `freeink-sdk/`, so no submodule initialization is required.
 
 ## Build
 
 ```sh
-pio run -e simulator
-pio run -e default
+pio run -e x4-pro
+pio run -e x4-pro-simulator
 ```
 
-`pio run` without an environment builds the X3/X4 and Sticky firmware targets listed in `platformio.ini`.
+`pio run` without an environment builds the sole production target, X4 Pro.
+Normal local builds include a development branch suffix. To create a clean release-version image, set `CROSSINK_RELEASE_VERSION=1.5.1` for the build.
+
+```sh
+CROSSINK_RELEASE_VERSION=1.5.1 pio run -e x4-pro
+```
 
 ## Flash
 
 ```sh
-pio run -e default --target upload
+pio run -e x4-pro --target upload
 ```
 
 ## Validation

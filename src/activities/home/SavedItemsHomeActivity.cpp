@@ -265,7 +265,7 @@ void SavedItemsHomeActivity::showSavedKindMenu(const int bookIndex) {
   items.push_back({FileBrowserAction::ViewClippings, StrId::STR_CLIPPINGS});
 
   startActivityForResult(
-      std::make_unique<FileBrowserActionActivity>(renderer, mappedInput, entry.bookTitle, std::move(items)),
+      makeUniqueNoThrow<FileBrowserActionActivity>(renderer, mappedInput, entry.bookTitle, std::move(items)),
       [this, entry](const ActivityResult& result) {
         const auto* actionResult = std::get_if<FileBrowserActionResult>(&result.data);
         if (result.isCancelled || !actionResult) {
@@ -301,8 +301,8 @@ void SavedItemsHomeActivity::showSavedBookActionMenu(const int bookIndex, const 
   }
 
   startActivityForResult(
-      std::make_unique<FileBrowserActionActivity>(renderer, mappedInput, entry.bookTitle, std::move(items),
-                                                  ignoreInitialConfirmRelease),
+      makeUniqueNoThrow<FileBrowserActionActivity>(renderer, mappedInput, entry.bookTitle, std::move(items),
+                                                   ignoreInitialConfirmRelease),
       [this, entry](const ActivityResult& result) {
         longPressOpenHandled = false;
         const auto* actionResult = std::get_if<FileBrowserActionResult>(&result.data);
@@ -345,7 +345,7 @@ void SavedItemsHomeActivity::openBookmarkList(const SavedBookEntry& entry) {
   BOOKMARKS.loadForBook(entry.bookPath, entry.bookTitle, entry.bookAuthor, entry.bookType);
 
   startActivityForResult(
-      std::make_unique<EpubReaderBookmarkListActivity>(renderer, mappedInput, BOOKMARKS.getBookmarks()),
+      makeUniqueNoThrow<EpubReaderBookmarkListActivity>(renderer, mappedInput, BOOKMARKS.getBookmarks()),
       [this, entry](const ActivityResult& result) {
         if (!result.isCancelled) {
           const auto* bm = std::get_if<BookmarkResult>(&result.data);
@@ -370,7 +370,7 @@ void SavedItemsHomeActivity::openBookmarkList(const SavedBookEntry& entry) {
 void SavedItemsHomeActivity::openClippingList(const SavedBookEntry& entry) {
   CLIPPINGS.loadForBook(entry.bookPath, entry.bookTitle, entry.bookAuthor, entry.bookType);
 
-  startActivityForResult(std::make_unique<EpubReaderClippingListActivity>(renderer, mappedInput),
+  startActivityForResult(makeUniqueNoThrow<EpubReaderClippingListActivity>(renderer, mappedInput),
                          [this, entry](const ActivityResult& result) {
                            if (!result.isCancelled) {
                              const auto* clipping = std::get_if<ClippingJumpResult>(&result.data);

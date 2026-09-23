@@ -5,6 +5,7 @@
 #include <HalGPIO.h>
 #include <HalStorage.h>
 #include <Logging.h>
+#include <Memory.h>
 
 #include <algorithm>
 #include <cstddef>
@@ -66,48 +67,59 @@ void UITheme::reload() {
 }
 
 void UITheme::setTheme(CrossPointSettings::UI_THEME type) {
+  std::unique_ptr<BaseTheme> nextTheme;
+  const ThemeMetrics* nextMetrics = &BaseMetrics::values;
   switch (type) {
     case CrossPointSettings::UI_THEME::CLASSIC:
       LOG_DBG("UI", "Using Classic theme");
-      currentTheme = std::make_unique<BaseTheme>();
-      currentMetrics = &BaseMetrics::values;
+      nextTheme = makeUniqueNoThrow<BaseTheme>();
       break;
     case CrossPointSettings::UI_THEME::LYRA:
       LOG_DBG("UI", "Using Lyra theme");
-      currentTheme = std::make_unique<LyraTheme>();
-      currentMetrics = &LyraMetrics::values;
+      nextTheme = makeUniqueNoThrow<LyraTheme>();
+      nextMetrics = &LyraMetrics::values;
       break;
     case CrossPointSettings::UI_THEME::ROUNDEDRAFF:
       LOG_DBG("UI", "Using RoundedRaff theme");
-      currentTheme = std::make_unique<RoundedRaffTheme>();
-      currentMetrics = &RoundedRaffMetrics::values;
+      nextTheme = makeUniqueNoThrow<RoundedRaffTheme>();
+      nextMetrics = &RoundedRaffMetrics::values;
       break;
     case CrossPointSettings::UI_THEME::LYRA_3_COVERS:
       LOG_DBG("UI", "Using Lyra 3 Covers theme");
-      currentTheme = std::make_unique<Lyra3CoversTheme>();
-      currentMetrics = &Lyra3CoversMetrics::values;
+      nextTheme = makeUniqueNoThrow<Lyra3CoversTheme>();
+      nextMetrics = &Lyra3CoversMetrics::values;
       break;
     case CrossPointSettings::UI_THEME::LYRA_CAROUSEL:
       LOG_DBG("UI", "Using Lyra Carousel theme");
-      currentTheme = std::make_unique<LyraCarouselTheme>();
-      currentMetrics = &LyraCarouselMetrics::values;
+      nextTheme = makeUniqueNoThrow<LyraCarouselTheme>();
+      nextMetrics = &LyraCarouselMetrics::values;
       break;
     case CrossPointSettings::UI_THEME::MINIMAL:
       LOG_DBG("UI", "Using Minimal theme");
-      currentTheme = std::make_unique<MinimalTheme>();
-      currentMetrics = &MinimalMetrics::values;
+      nextTheme = makeUniqueNoThrow<MinimalTheme>();
+      nextMetrics = &MinimalMetrics::values;
       break;
     case CrossPointSettings::UI_THEME::DASHBOARD:
       LOG_DBG("UI", "Using Dashboard theme");
-      currentTheme = std::make_unique<DashboardTheme>();
-      currentMetrics = &DashboardMetrics::values;
+      nextTheme = makeUniqueNoThrow<DashboardTheme>();
+      nextMetrics = &DashboardMetrics::values;
       break;
     default:
       LOG_ERR("UI", "Unknown theme %d, falling back to Classic", static_cast<int>(type));
-      currentTheme = std::make_unique<BaseTheme>();
-      currentMetrics = &BaseMetrics::values;
+      nextTheme = makeUniqueNoThrow<BaseTheme>();
       break;
   }
+  if (!nextTheme) {
+    LOG_ERR("UI", "OOM: unable to allocate requested theme; keeping current theme");
+    if (currentTheme) return;
+    // The inline BaseTheme fallback requires no heap and keeps startup/error UI
+    // usable even when the requested theme cannot be allocated.
+    currentMetrics = &BaseMetrics::values;
+    metricsValid = false;
+    return;
+  }
+  currentTheme = std::move(nextTheme);
+  currentMetrics = nextMetrics;
   metricsValid = false;
 }
 

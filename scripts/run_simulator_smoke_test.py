@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -73,7 +74,7 @@ def run_smoke(args: argparse.Namespace) -> int:
         print(f"Run: pio run -e {args.env}", file=sys.stderr)
         return 2
 
-    with tempfile.TemporaryDirectory(prefix="crossink-sim-smoke-") as temp_dir_name:
+    with tempfile.TemporaryDirectory(prefix="crossdito-sim-smoke-") as temp_dir_name:
         temp_root = Path(temp_dir_name)
         simulator_book_path = prepare_fs(temp_root, book)
 
@@ -112,13 +113,39 @@ def run_smoke(args: argparse.Namespace) -> int:
         print("Simulator smoke test did not print its success marker", file=sys.stderr)
         return 2
 
+    stored_positions = re.findall(r"Stored previous reading position: spine=(\d+) page=(\d+)", proc.stdout)
+    returned_positions = re.findall(r"Returning to previous reading position: spine=(\d+) page=(\d+)", proc.stdout)
+    if not stored_positions or not returned_positions:
+        print("Simulator smoke test did not exercise previous-position navigation", file=sys.stderr)
+        return 2
+    if stored_positions[-1] != returned_positions[-1]:
+        print(
+            f"Previous-position mismatch: stored={stored_positions[-1]} returned={returned_positions[-1]}",
+            file=sys.stderr,
+        )
+        return 2
+
+    navigation_trace = re.search(
+        r"Stored previous reading position: spine=(\d+) page=\d+(.*?)Returning to previous reading position:",
+        proc.stdout,
+        re.DOTALL,
+    )
+    if navigation_trace is None:
+        print("Simulator smoke test could not isolate the previous-position navigation trace", file=sys.stderr)
+        return 2
+    origin_spine = navigation_trace.group(1)
+    loaded_spines = re.findall(r"Loading file: .*?, index: (\d+)", navigation_trace.group(2))
+    if not any(spine != origin_spine for spine in loaded_spines):
+        print("Previous-position test did not navigate away from its origin chapter", file=sys.stderr)
+        return 2
+
     return 0
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--book", default=str(DEFAULT_BOOK), help="EPUB fixture to copy into the isolated simulator fs_")
-    parser.add_argument("--env", choices=("simulator", "sticky-simulator", "x4-pro-simulator"), default="simulator",
+    parser.add_argument("--env", choices=("x4-pro-simulator",), default="x4-pro-simulator",
                         help="PlatformIO simulator environment to build and run")
     parser.add_argument("--timeout", type=int, default=45, help="Seconds before the simulator run is treated as hung")
     parser.add_argument("--page-turns", type=int, default=2, help="Number of EPUB page-forward taps to run")

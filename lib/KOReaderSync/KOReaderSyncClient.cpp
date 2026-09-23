@@ -6,6 +6,7 @@
 #endif
 #include <I18n.h>
 #include <Logging.h>
+#include <Memory.h>
 #ifdef SIMULATOR
 #include <SecureHttpClient.h>
 #include <WiFi.h>
@@ -177,7 +178,11 @@ KOReaderSyncClient::Error KOReaderSyncClient::authenticate() {
   WiFiClient plainClient;
 
   if (isHttpsUrl(url)) {
-    secureClient.reset(new WiFiClientSecure);
+    secureClient = makeUniqueNoThrow<WiFiClientSecure>();
+    if (!secureClient) {
+      LOG_ERR("KOSync", "Failed to allocate simulator TLS client");
+      return LOW_MEMORY;
+    }
     secureClient->setInsecure();
     http.begin(*secureClient, url.c_str());
   } else {
@@ -292,7 +297,11 @@ KOReaderSyncClient::Error KOReaderSyncClient::getProgress(const std::string& doc
   WiFiClient plainClient;
 
   if (isHttpsUrl(url)) {
-    secureClient.reset(new WiFiClientSecure);
+    secureClient = makeUniqueNoThrow<WiFiClientSecure>();
+    if (!secureClient) {
+      LOG_ERR("KOSync", "Failed to allocate simulator TLS client");
+      return LOW_MEMORY;
+    }
     secureClient->setInsecure();
     http.begin(*secureClient, url.c_str());
   } else {
@@ -476,7 +485,11 @@ KOReaderSyncClient::Error KOReaderSyncClient::updateProgress(const KOReaderProgr
   WiFiClient plainClient;
 
   if (isHttpsUrl(url)) {
-    secureClient.reset(new WiFiClientSecure);
+    secureClient = makeUniqueNoThrow<WiFiClientSecure>();
+    if (!secureClient) {
+      LOG_ERR("KOSync", "Failed to allocate simulator TLS client");
+      return LOW_MEMORY;
+    }
     secureClient->setInsecure();
     http.begin(*secureClient, url.c_str());
   } else {

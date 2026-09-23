@@ -1,5 +1,7 @@
 #include <HalDisplay.h>
 #include <HalGPIO.h>
+#include <HalPowerManager.h>
+#include <Logging.h>
 
 #include "HalSpiBus.h"
 
@@ -8,26 +10,56 @@ HalDisplay display;
 
 #define SD_SPI_MISO 7
 
+namespace {
+void beginDisplayBusyWait() {
+  // Change the clock while the display still owns shared SPI. A waiting SD task
+  // can only start after the new frequency is stable, avoiding a clock change
+  // in the middle of an SPI transaction on C3/Sticky boards.
+  powerManager.beginDisplayBusyWait();
+  HalSpiBus::beginDisplayBusyWait();
+}
+
+void endDisplayBusyWait() {
+  // Finish any SD transaction that borrowed shared SPI before changing the
+  // clock again. Full speed is restored before the panel driver resumes work.
+  HalSpiBus::endDisplayBusyWait();
+  powerManager.endDisplayBusyWait();
+}
+}  // namespace
+
 HalDisplay::HalDisplay() : einkDisplay(EPD_SCLK, EPD_MOSI, EPD_CS, EPD_DC, EPD_RST, EPD_BUSY) {}
 
 HalDisplay::~HalDisplay() {}
 
-void HalDisplay::begin(bool seamless) {
+bool HalDisplay::begin(bool seamless) {
   HalSpiBus::Lock spiLock;
+  if (!spiLock) {
+    LOG_ERR("EPD", "SPI bus lock is unavailable");
+    return false;
+  }
 
   // Set X3-specific panel mode before initializing.
   if (gpio.deviceIsX3()) {
     einkDisplay.setDisplayX3();
   }
 
+  einkDisplay.setBusyWaitHooks(beginDisplayBusyWait, endDisplayBusyWait);
   einkDisplay.begin();
+
+  if (!einkDisplay.getFrameBuffer()) {
+    LOG_ERR("EPD", "Framebuffer allocation failed (free=%u maxAlloc=%u)", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+#if defined(BOARD_HAS_PSRAM)
+    LOG_ERR("EPD", "PSRAM state: free=%u maxAlloc=%u", ESP.getFreePsram(), ESP.getMaxAllocPsram());
+#endif
+    return false;
+  }
 
   if (seamless) {
     // Defuse the SDK's X3 _x3InitialFullSyncsRemaining counter (no-op on X4)
     // so the first paint isn't promoted to FULL (~770ms). Skips the wakeup-
     // gated requestResync() below for the same reason.
     einkDisplay.skipInitialResync();
-    return;
+    return true;
   }
   // Request resync after specific wakeup events to ensure clean display state.
   const auto wakeupReason = gpio.getWakeupReason();
@@ -35,6 +67,7 @@ void HalDisplay::begin(bool seamless) {
       wakeupReason == HalGPIO::WakeupReason::Other) {
     einkDisplay.requestResync();
   }
+  return true;
 }
 
 void HalDisplay::clearScreen(uint8_t color) const { einkDisplay.clearScreen(color); }
@@ -77,6 +110,8 @@ void HalDisplay::setInverted(bool inverted) {
 }
 
 void HalDisplay::displayBufferAsync(HalDisplay::RefreshMode mode) {
+  HalSpiBus::Lock spiLock;
+
   if (gpio.deviceIsX3() && mode == RefreshMode::HALF_REFRESH) {
     einkDisplay.requestResync(1);
   }
@@ -84,7 +119,10 @@ void HalDisplay::displayBufferAsync(HalDisplay::RefreshMode mode) {
   einkDisplay.displayBufferAsyncNoShadow(convertRefreshMode(mode));
 }
 
-void HalDisplay::waitRefreshComplete() { einkDisplay.waitRefreshComplete(); }
+void HalDisplay::waitRefreshComplete() {
+  HalSpiBus::Lock spiLock;
+  einkDisplay.waitRefreshComplete();
+}
 
 bool HalDisplay::supportsAsyncRefresh() const { return einkDisplay.supportsAsyncRefresh(); }
 
@@ -119,15 +157,24 @@ void HalDisplay::deepSleep() {
 
 uint8_t* HalDisplay::getFrameBuffer() const { return einkDisplay.getFrameBuffer(); }
 
-uint8_t* HalDisplay::lendFrameBufferStorage(uint32_t* sizeOut) { return einkDisplay.lendBuildStorage(sizeOut); }
+uint8_t* HalDisplay::lendFrameBufferStorage(uint32_t* sizeOut) {
+  HalSpiBus::Lock spiLock;
+  return einkDisplay.lendBuildStorage(sizeOut);
+}
 
-void HalDisplay::returnFrameBufferStorage() { einkDisplay.returnBuildStorage(); }
+void HalDisplay::returnFrameBufferStorage() {
+  HalSpiBus::Lock spiLock;
+  einkDisplay.returnBuildStorage();
+}
 
 void HalDisplay::copyGrayscaleBuffers(const uint8_t* lsbBuffer, const uint8_t* msbBuffer) {
+  HalSpiBus::Lock spiLock;
   einkDisplay.copyGrayscaleBuffers(lsbBuffer, msbBuffer);
 }
 
 void HalDisplay::displayGrayscaleBase(RefreshMode fallback, bool turnOffScreen) {
+  HalSpiBus::Lock spiLock;
+
   // X3: a HALF or FULL fallback means the caller wants a clean base (e.g. the
   // sleep cover, a full-screen swap from arbitrary prior content). Without
   // this, the X3 grayscale base takes its gentle differential happy path and
@@ -141,17 +188,30 @@ void HalDisplay::displayGrayscaleBase(RefreshMode fallback, bool turnOffScreen) 
   einkDisplay.displayGrayscaleBase(convertRefreshMode(fallback), turnOffScreen);
 }
 
-void HalDisplay::preconditionGrayscale() { einkDisplay.preconditionGrayscale(); }
+void HalDisplay::preconditionGrayscale() {
+  HalSpiBus::Lock spiLock;
+  einkDisplay.preconditionGrayscale();
+}
 
 void HalDisplay::preconditionGrayscale(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
+  HalSpiBus::Lock spiLock;
   einkDisplay.preconditionGrayscale(x, y, w, h);
 }
 
-void HalDisplay::copyGrayscaleLsbBuffers(const uint8_t* lsbBuffer) { einkDisplay.copyGrayscaleLsbBuffers(lsbBuffer); }
+void HalDisplay::copyGrayscaleLsbBuffers(const uint8_t* lsbBuffer) {
+  HalSpiBus::Lock spiLock;
+  einkDisplay.copyGrayscaleLsbBuffers(lsbBuffer);
+}
 
-void HalDisplay::copyGrayscaleMsbBuffers(const uint8_t* msbBuffer) { einkDisplay.copyGrayscaleMsbBuffers(msbBuffer); }
+void HalDisplay::copyGrayscaleMsbBuffers(const uint8_t* msbBuffer) {
+  HalSpiBus::Lock spiLock;
+  einkDisplay.copyGrayscaleMsbBuffers(msbBuffer);
+}
 
-void HalDisplay::cleanupGrayscaleBuffers(const uint8_t* bwBuffer) { einkDisplay.cleanupGrayscaleBuffers(bwBuffer); }
+void HalDisplay::cleanupGrayscaleBuffers(const uint8_t* bwBuffer) {
+  HalSpiBus::Lock spiLock;
+  einkDisplay.cleanupGrayscaleBuffers(bwBuffer);
+}
 
 void HalDisplay::displayGrayBuffer(bool turnOffScreen) {
   HalSpiBus::Lock spiLock;

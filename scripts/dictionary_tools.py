@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-dict_tools.py — Offline StarDict dictionary tools for CrossPoint Reader.
+dict_tools.py — Offline StarDict dictionary tools for CrossDiTo.
 
 Subcommands:
   prep   — Pre-process a dictionary (decompress, generate offset files)
@@ -45,7 +45,7 @@ def _build_oft(data: bytes, skip_bytes_after_null: int) -> bytes:
 
 
 # ---------------------------------------------------------------------------
-# .cspt constants — CrossPoint optimized index
+# .cspt constants — CrossDiTo optimized index
 # ---------------------------------------------------------------------------
 
 _CSPT_MAGIC = b"CSPT"
@@ -547,7 +547,7 @@ def merge(sources: list[Path], output: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Offline StarDict dictionary tools for CrossPoint Reader.",
+        description="Offline StarDict dictionary tools for CrossDiTo.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     sub = parser.add_subparsers(dest="command", required=True)

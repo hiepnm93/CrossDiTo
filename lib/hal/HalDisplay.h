@@ -28,7 +28,7 @@ class HalDisplay {
   // requestResync() and defuses the SDK's X3 _x3InitialFullSyncsRemaining
   // counter; otherwise the first two paints get promoted to FULL
   // (~770ms each on X3).
-  void begin(bool seamless = false);
+  bool begin(bool seamless = false);
 
   // Display dimensions
   static constexpr uint16_t DISPLAY_WIDTH = EInkDisplay::DISPLAY_WIDTH;

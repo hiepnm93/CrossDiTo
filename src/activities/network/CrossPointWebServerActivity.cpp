@@ -24,24 +24,23 @@
 
 namespace {
 // AP Mode configuration
-constexpr const char* AP_SSID = "CrossPoint-Reader";
+constexpr const char* AP_SSID = "CrossDiTo-Reader";
 constexpr const char* AP_PASSWORD = nullptr;  // Open network for ease of use
-constexpr const char* AP_HOSTNAME = "crosspoint";
+constexpr const char* AP_HOSTNAME = "crossdito";
 constexpr uint8_t AP_CHANNEL = 1;
 constexpr uint8_t AP_MAX_CONNECTIONS = 4;
 constexpr int QR_CODE_WIDTH = 198;
 constexpr int QR_CODE_HEIGHT = 198;
 
 // DNS server for captive portal (redirects all DNS queries to our IP)
-DNSServer* dnsServer = nullptr;
+std::unique_ptr<DNSServer> dnsServer;
 constexpr uint16_t DNS_PORT = 53;
 
 void stopDnsServer() {
   if (!dnsServer) return;
 
   dnsServer->stop();
-  delete dnsServer;
-  dnsServer = nullptr;
+  dnsServer.reset();
 }
 
 void restartMdns(const char* hostname, const char* tag) {
@@ -88,7 +87,7 @@ void CrossPointWebServerActivity::onEnter() {
   }
 
   // Launch network mode selection subactivity
-  startActivityForResult(std::make_unique<NetworkModeSelectionActivity>(renderer, mappedInput),
+  startActivityForResult(makeUniqueNoThrow<NetworkModeSelectionActivity>(renderer, mappedInput),
                          [this](const ActivityResult& result) {
                            if (result.isCancelled) {
                              exitToOrigin();
@@ -124,8 +123,7 @@ void CrossPointWebServerActivity::onExit() {
   MDNS.end();
   if (dnsServer) {
     dnsServer->stop();
-    delete dnsServer;
-    dnsServer = nullptr;
+    dnsServer.reset();
   }
   delay(50);
 
@@ -212,7 +210,7 @@ void CrossPointWebServerActivity::onNetworkModeSelected(const NetworkMode mode) 
         return;
       }
 
-      startActivityForResult(std::make_unique<NetworkModeSelectionActivity>(renderer, mappedInput),
+      startActivityForResult(makeUniqueNoThrow<NetworkModeSelectionActivity>(renderer, mappedInput),
                              [this](const ActivityResult& result) {
                                if (result.isCancelled) {
                                  exitToOrigin();
@@ -229,7 +227,7 @@ void CrossPointWebServerActivity::onNetworkModeSelected(const NetworkMode mode) 
     WiFi.mode(WIFI_STA);
 
     state = WebServerActivityState::WIFI_SELECTION;
-    startActivityForResult(std::make_unique<WifiSelectionActivity>(renderer, mappedInput),
+    startActivityForResult(makeUniqueNoThrow<WifiSelectionActivity>(renderer, mappedInput),
                            [this](const ActivityResult& result) {
                              if (!result.isCancelled) {
                                const auto& wifi = std::get<WifiResult>(result.data);
@@ -260,7 +258,7 @@ void CrossPointWebServerActivity::onWifiSelectionComplete(const bool connected) 
     // User cancelled - go back to mode selection
     state = WebServerActivityState::MODE_SELECTION;
 
-    startActivityForResult(std::make_unique<NetworkModeSelectionActivity>(renderer, mappedInput),
+    startActivityForResult(makeUniqueNoThrow<NetworkModeSelectionActivity>(renderer, mappedInput),
                            [this](const ActivityResult& result) {
                              if (result.isCancelled) {
                                exitToOrigin();
@@ -308,7 +306,12 @@ void CrossPointWebServerActivity::startAccessPoint() {
   // Start DNS server for captive portal behavior
   // This redirects all DNS queries to our IP, making any domain typed resolve to us
   stopDnsServer();
-  dnsServer = new DNSServer();
+  dnsServer = makeUniqueNoThrow<DNSServer>();
+  if (!dnsServer) {
+    LOG_ERR("WEBACT", "Failed to allocate DNS server");
+    exitToOrigin();
+    return;
+  }
   dnsServer->setErrorReplyCode(DNSReplyCode::NoError);
   dnsServer->start(DNS_PORT, "*", apIP);
 
@@ -320,7 +323,12 @@ void CrossPointWebServerActivity::startAccessPoint() {
 
 void CrossPointWebServerActivity::startWebServer() {
   // Create the web server instance
-  webServer.reset(new CrossPointWebServer());
+  webServer = makeUniqueNoThrow<CrossPointWebServer>();
+  if (!webServer) {
+    LOG_ERR("WEBACT", "Failed to allocate web server");
+    exitToOrigin();
+    return;
+  }
   webServer->begin();
 
   if (webServer->isRunning()) {

@@ -228,17 +228,34 @@ bool GfxRenderer::releaseSdCardFontForLowMemory(int fontId, const bool preserveA
   return true;
 }
 
-void GfxRenderer::begin() {
+bool GfxRenderer::begin() {
+  if (!bitmapScratchMutex_) {
+    bitmapScratchMutex_ = xSemaphoreCreateMutex();
+    if (!bitmapScratchMutex_) {
+      LOG_ERR("GFX", "Failed to create bitmap scratch mutex");
+      return false;
+    }
+  }
+
   frameBuffer = display.getFrameBuffer();
   if (!frameBuffer) {
-    LOG_ERR("GFX", "!! No framebuffer");
-    assert(false);
+    LOG_ERR("GFX", "No framebuffer available");
+    return false;
   }
   panelWidth = display.getDisplayWidth();
   panelHeight = display.getDisplayHeight();
   panelWidthBytes = display.getDisplayWidthBytes();
   frameBufferSize = display.getBufferSize();
-  bwBufferChunks.assign((frameBufferSize + BW_BUFFER_CHUNK_SIZE - 1) / BW_BUFFER_CHUNK_SIZE, nullptr);
+  bwBufferChunkCount = (frameBufferSize + BW_BUFFER_CHUNK_SIZE - 1) / BW_BUFFER_CHUNK_SIZE;
+  if (bwBufferChunkCount > bwBufferChunks.size()) {
+    LOG_ERR("GFX", "Framebuffer needs %zu grayscale chunks, capacity is %zu", bwBufferChunkCount,
+            bwBufferChunks.size());
+    frameBuffer = nullptr;
+    bwBufferChunkCount = 0;
+    return false;
+  }
+  bwBufferChunks.fill(nullptr);
+  return true;
 }
 
 void GfxRenderer::freeBitmapScratchBuffers() {
@@ -890,6 +907,11 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
         }
       }
     } else {
+      if constexpr (rotation == TextRotation::None) {
+        if (renderer.drawGlyphBitmap1BitFast(bitmap, width, height, innerBase, outerBase, pixelState)) {
+          return;
+        }
+      }
       int pixelPosition = 0;
       for (int glyphY = 0; glyphY < height; glyphY++) {
         const int outerCoord = outerBase + glyphY;
@@ -980,6 +1002,111 @@ void GfxRenderer::drawPixel(const int x, const int y, const bool state) const {
     target[byteIndex] |= 1 << bitPosition;  // Set bit
   }
 }
+
+#if defined(__GNUC__) && !defined(SIMULATOR)
+#define CROSSDITO_GLYPH_HOT __attribute__((hot, optimize("O2")))
+#else
+#define CROSSDITO_GLYPH_HOT
+#endif
+
+CROSSDITO_GLYPH_HOT bool GfxRenderer::drawGlyphBitmap1BitFast(const uint8_t* bitmap, const int width, const int height,
+                                                              const int x, const int y, const bool state) const {
+  if (!bitmap || !frameBuffer || _stripActive || width <= 0 || height <= 0 || x < 0 || y < 0 ||
+      x > getScreenWidth() - width || y > getScreenHeight() - height) {
+    return false;
+  }
+
+  const auto applyMask = [state](uint8_t* row, const int byteIndex, const uint8_t mask) {
+    if (state) {
+      row[byteIndex] &= static_cast<uint8_t>(~mask);
+    } else {
+      row[byteIndex] |= mask;
+    }
+  };
+  const auto hasInk = [bitmap](const int sourcePosition) {
+    return (bitmap[sourcePosition >> 3] & (0x80U >> (sourcePosition & 7))) != 0;
+  };
+
+  switch (orientation) {
+    case LandscapeCounterClockwise: {
+      for (int glyphY = 0; glyphY < height; ++glyphY) {
+        uint8_t* row = frameBuffer + static_cast<uint32_t>(y + glyphY) * panelWidthBytes;
+        int activeByte = -1;
+        uint8_t mask = 0;
+        const int sourceRow = glyphY * width;
+        for (int glyphX = 0; glyphX < width; ++glyphX) {
+          if (!hasInk(sourceRow + glyphX)) continue;
+          const int physicalX = x + glyphX;
+          const int byteIndex = physicalX >> 3;
+          if (activeByte >= 0 && byteIndex != activeByte) {
+            applyMask(row, activeByte, mask);
+            mask = 0;
+          }
+          activeByte = byteIndex;
+          mask |= static_cast<uint8_t>(0x80U >> (physicalX & 7));
+        }
+        if (activeByte >= 0) applyMask(row, activeByte, mask);
+      }
+      break;
+    }
+
+    case LandscapeClockwise: {
+      for (int glyphY = 0; glyphY < height; ++glyphY) {
+        const int physicalY = panelHeight - 1 - (y + glyphY);
+        uint8_t* row = frameBuffer + static_cast<uint32_t>(physicalY) * panelWidthBytes;
+        int activeByte = -1;
+        uint8_t mask = 0;
+        const int sourceRow = glyphY * width;
+        for (int glyphX = 0; glyphX < width; ++glyphX) {
+          if (!hasInk(sourceRow + glyphX)) continue;
+          const int physicalX = panelWidth - 1 - (x + glyphX);
+          const int byteIndex = physicalX >> 3;
+          if (activeByte >= 0 && byteIndex != activeByte) {
+            applyMask(row, activeByte, mask);
+            mask = 0;
+          }
+          activeByte = byteIndex;
+          mask |= static_cast<uint8_t>(0x80U >> (physicalX & 7));
+        }
+        if (activeByte >= 0) applyMask(row, activeByte, mask);
+      }
+      break;
+    }
+
+    case Portrait: {
+      for (int glyphY = 0; glyphY < height; ++glyphY) {
+        const int physicalX = y + glyphY;
+        const int byteIndex = physicalX >> 3;
+        const uint8_t mask = static_cast<uint8_t>(0x80U >> (physicalX & 7));
+        const int sourceRow = glyphY * width;
+        for (int glyphX = 0; glyphX < width; ++glyphX) {
+          if (!hasInk(sourceRow + glyphX)) continue;
+          const int physicalY = panelHeight - 1 - (x + glyphX);
+          applyMask(frameBuffer + static_cast<uint32_t>(physicalY) * panelWidthBytes, byteIndex, mask);
+        }
+      }
+      break;
+    }
+
+    case PortraitInverted: {
+      for (int glyphY = 0; glyphY < height; ++glyphY) {
+        const int physicalX = panelWidth - 1 - (y + glyphY);
+        const int byteIndex = physicalX >> 3;
+        const uint8_t mask = static_cast<uint8_t>(0x80U >> (physicalX & 7));
+        const int sourceRow = glyphY * width;
+        for (int glyphX = 0; glyphX < width; ++glyphX) {
+          if (!hasInk(sourceRow + glyphX)) continue;
+          const int physicalY = x + glyphX;
+          applyMask(frameBuffer + static_cast<uint32_t>(physicalY) * panelWidthBytes, byteIndex, mask);
+        }
+      }
+      break;
+    }
+  }
+  return true;
+}
+
+#undef CROSSDITO_GLYPH_HOT
 
 namespace {
 
@@ -3091,7 +3218,8 @@ bool GfxRenderer::shouldSkipImageBlanking() const {
 bool GfxRenderer::supportsStripGrayscale() const { return display.supportsStripGrayscale(); }
 
 void GfxRenderer::freeBwBufferChunks() {
-  for (auto& bwBufferChunk : bwBufferChunks) {
+  for (size_t i = 0; i < bwBufferChunkCount; ++i) {
+    auto& bwBufferChunk = bwBufferChunks[i];
     if (bwBufferChunk) {
       free(bwBufferChunk);
       bwBufferChunk = nullptr;
@@ -3107,7 +3235,7 @@ void GfxRenderer::freeBwBufferChunks() {
  */
 bool GfxRenderer::storeBwBuffer() {
   // Allocate and copy each chunk
-  for (size_t i = 0; i < bwBufferChunks.size(); i++) {
+  for (size_t i = 0; i < bwBufferChunkCount; i++) {
     // Check if any chunks are already allocated
     if (bwBufferChunks[i]) {
       LOG_ERR("GFX", "!! BW buffer chunk %zu already stored - this is likely a bug, freeing chunk", i);
@@ -3129,7 +3257,7 @@ bool GfxRenderer::storeBwBuffer() {
     memcpy(bwBufferChunks[i], frameBuffer + offset, chunkSize);
   }
 
-  LOG_DBG("GFX", "Stored BW buffer in %zu chunks (%zu bytes each)", bwBufferChunks.size(), BW_BUFFER_CHUNK_SIZE);
+  LOG_DBG("GFX", "Stored BW buffer in %zu chunks (%zu bytes each)", bwBufferChunkCount, BW_BUFFER_CHUNK_SIZE);
   return true;
 }
 
@@ -3141,8 +3269,8 @@ bool GfxRenderer::storeBwBuffer() {
 void GfxRenderer::restoreBwBuffer() {
   // Check if all chunks are allocated
   bool missingChunks = false;
-  for (const auto& bwBufferChunk : bwBufferChunks) {
-    if (!bwBufferChunk) {
+  for (size_t i = 0; i < bwBufferChunkCount; ++i) {
+    if (!bwBufferChunks[i]) {
       missingChunks = true;
       break;
     }
@@ -3153,7 +3281,7 @@ void GfxRenderer::restoreBwBuffer() {
     return;
   }
 
-  for (size_t i = 0; i < bwBufferChunks.size(); i++) {
+  for (size_t i = 0; i < bwBufferChunkCount; i++) {
     const size_t offset = i * BW_BUFFER_CHUNK_SIZE;
     const size_t chunkSize = std::min(BW_BUFFER_CHUNK_SIZE, static_cast<size_t>(frameBufferSize - offset));
     memcpy(frameBuffer + offset, bwBufferChunks[i], chunkSize);

@@ -76,7 +76,7 @@ bool skipResourceField(HalFile& file, uint32_t* pos, uint32_t end) {
 static constexpr uint32_t OFT_HEADER_SIZE = 38;
 static constexpr uint32_t OFT_STRIDE = 32;  // words per page
 
-// .idx.oft.cspt file constants (CrossPoint optimized index).
+// .idx.oft.cspt file constants (CrossDiTo optimized index).
 // Header: 12 bytes = magic(4) + version(1) + prefixLen(1) + stride(2) + entryCount(4).
 // Each entry: prefixLen bytes (null-padded headword) + 4-byte LE idx offset = 20 bytes.
 static constexpr uint8_t CSPT_MAGIC[4] = {'C', 'S', 'P', 'T'};
@@ -626,7 +626,7 @@ bool Dictionary::binarySearchQuickIndex(HalFile& qidx, HalFile& idx, const uint3
 bool Dictionary::resolveScanBounds(const char* csptPath, const char* oftPath, HalFile& src, uint32_t srcFileSize,
                                    const char* target, uint32_t* startByte, uint32_t* endByte,
                                    bool startBeforeCaseMatches) {
-  // Try .cspt first (CrossPoint optimized index), fall back to .oft.
+  // Try .cspt first (CrossDiTo optimized index), fall back to .oft.
   bool boundsResolved = false;
   HalFile cspt;
   if (Storage.openFileForRead("DICT", csptPath, cspt)) {

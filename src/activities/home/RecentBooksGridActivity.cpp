@@ -496,7 +496,7 @@ void RecentBooksGridActivity::promptDeleteBook(const RecentBook& book) {
   };
 
   const std::string heading = tr(STR_DELETE) + std::string("? ");
-  startActivityForResult(std::make_unique<ConfirmationActivity>(renderer, mappedInput, heading, book.title),
+  startActivityForResult(makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, heading, book.title),
                          std::move(handler));
 }
 
@@ -511,7 +511,7 @@ void RecentBooksGridActivity::promptRemoveBook(const std::string& path, const st
   };
 
   startActivityForResult(
-      std::make_unique<ConfirmationActivity>(renderer, mappedInput, tr(STR_REMOVE_FROM_RECENTS), title),
+      makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_REMOVE_FROM_RECENTS), title),
       std::move(handler));
 }
 
@@ -526,8 +526,8 @@ void RecentBooksGridActivity::showBookActionMenu(const int bookIndex, const bool
   }
 
   startActivityForResult(
-      std::make_unique<FileBrowserActionActivity>(renderer, mappedInput, book.title, std::move(items),
-                                                  ignoreInitialConfirmRelease),
+      makeUniqueNoThrow<FileBrowserActionActivity>(renderer, mappedInput, book.title, std::move(items),
+                                                   ignoreInitialConfirmRelease),
       [this, book](const ActivityResult& result) {
         longPressFired = false;
         if (result.isCancelled) {
@@ -546,7 +546,7 @@ void RecentBooksGridActivity::showBookActionMenu(const int bookIndex, const bool
             return;
           case FileBrowserAction::DeleteCache:
             startActivityForResult(
-                std::make_unique<ConfirmationActivity>(
+                makeUniqueNoThrow<ConfirmationActivity>(
                     renderer, mappedInput, BookActions::confirmationHeading(StrId::STR_DELETE_CACHE), book.title),
                 [this, book](const ActivityResult& confirmation) {
                   if (!confirmation.isCancelled) {
@@ -562,7 +562,7 @@ void RecentBooksGridActivity::showBookActionMenu(const int bookIndex, const bool
             return;
           case FileBrowserAction::DeleteStats:
             startActivityForResult(
-                std::make_unique<ConfirmationActivity>(
+                makeUniqueNoThrow<ConfirmationActivity>(
                     renderer, mappedInput, BookActions::confirmationHeading(StrId::STR_DELETE_BOOK_STATS), book.title),
                 [this, book](const ActivityResult& confirmation) {
                   if (!confirmation.isCancelled) {
@@ -578,7 +578,7 @@ void RecentBooksGridActivity::showBookActionMenu(const int bookIndex, const bool
             return;
           case FileBrowserAction::ResetReaderSettings:
             startActivityForResult(
-                std::make_unique<ConfirmationActivity>(
+                makeUniqueNoThrow<ConfirmationActivity>(
                     renderer, mappedInput, BookActions::confirmationHeading(StrId::STR_RESET_BOOK_READER_SETTINGS),
                     book.title),
                 [this, book](const ActivityResult& confirmation) {
@@ -606,9 +606,9 @@ void RecentBooksGridActivity::showBookActionMenu(const int bookIndex, const bool
             const uint8_t currentIndex =
                 BookActions::epubRenderModeDisplayIndex(EpubReaderActivity::loadBookRenderMode(book.path));
             startActivityForResult(
-                std::make_unique<OptionSelectionActivity>(renderer, mappedInput, "RecentGridEpubRenderModeSelect",
-                                                          StrId::STR_EPUB_RENDER_MODE,
-                                                          BookActions::epubRenderModeOptions(), currentIndex),
+                makeUniqueNoThrow<OptionSelectionActivity>(renderer, mappedInput, "RecentGridEpubRenderModeSelect",
+                                                           StrId::STR_EPUB_RENDER_MODE,
+                                                           BookActions::epubRenderModeOptions(), currentIndex),
                 [this, book](const ActivityResult& selectionResult) {
                   if (!selectionResult.isCancelled) {
                     const auto* selection = std::get_if<OptionSelectionResult>(&selectionResult.data);

@@ -2,25 +2,14 @@
 PlatformIO post-build script: copy firmware.bin to convenient artifact names
 in the same build directory.
 
-Default outputs:
-  .pio/build/default/firmware-x3-x4.bin
-  .pio/build/x4-pro/firmware-x4-pro.bin
-  .pio/build/x4-classic/firmware-x4-classic.bin
-  .pio/build/sticky/firmware-sticky.bin
-  .pio/build/x4-pro/firmware-x4-pro.bin
+Default output:
+  .pio/build/x4-pro/CrossDiTo-x4-pro.bin
 
-Release-candidate outputs when CROSSINK_RC_ARTIFACTS=1:
-  .pio/build/default/firmware-x3-x4-<branch>-<hash>-RC.bin
-  .pio/build/sticky/firmware-sticky-<branch>-<hash>-RC.bin
-  .pio/build/x4-pro/firmware-x4-pro-<branch>-<hash>-RC.bin
-  .pio/build/x4-classic/firmware-x4-classic-<branch>-<hash>-RC.bin
+Release-candidate output when CROSSINK_RC_ARTIFACTS=1:
+  .pio/build/x4-pro/CrossDiTo-x4-pro-<branch>-<hash>-RC.bin
 
-Release outputs when CROSSINK_RELEASE_VERSION is set:
-  .pio/build/default/firmware-x3-x4-v<version>.bin
-  .pio/build/x4-pro/firmware-x4-pro-v<version>.bin
-  .pio/build/x4-classic/firmware-x4-classic-v<version>.bin
-  .pio/build/sticky/firmware-sticky-v<version>.bin
-  .pio/build/x4-pro/firmware-x4-pro-v<version>.bin
+Release output when CROSSINK_RELEASE_VERSION is set:
+  .pio/build/x4-pro/CrossDiTo-x4-pro-v<version>.bin
 """
 
 import os
@@ -28,6 +17,8 @@ import re
 import shutil
 import subprocess
 import sys
+
+PRODUCT_NAME = 'CrossDiTo'
 
 
 def _copy_artifact(src, dst):
@@ -100,20 +91,20 @@ def _get_rc_artifact_name(project_dir, env):
         _get_project_option(env, 'custom_rc_hash')
         or os.environ.get('CROSSINK_RC_HASH')
         or _get_git_value(
-        project_dir,
-        'rev-parse',
-        '--short',
-        'HEAD',
-        fallback='00000',
-    )
+            project_dir,
+            'rev-parse',
+            '--short',
+            'HEAD',
+            fallback='00000',
+        )
     )
     branch = _sanitize_branch(branch)
     short_hash = re.sub(r'[^A-Za-z0-9]+', '', short_hash)[:12] or '00000'
-    return f'firmware-{device_type}-{branch}-{short_hash}-RC.bin'
+    return f'{PRODUCT_NAME}-{device_type}-{branch}-{short_hash}-RC.bin'
 
 
 def _is_rc_artifact_build(env):
-    flag = _get_project_option(env, 'custom_rc_artifacts') or os.environ.get('CROSSINK_RELEASE_VERSION')
+    flag = _get_project_option(env, 'custom_rc_artifacts') or os.environ.get('CROSSINK_RC_ARTIFACTS')
     return str(flag).strip().lower() in {'1', 'true', 'yes', 'on'}
 
 
@@ -135,7 +126,7 @@ def rename_firmware(source, target, env):
     build_dir = os.path.dirname(src)
 
     device_type = _get_firmware_device_type(env)
-    default_dst = os.path.join(build_dir, f'firmware-{device_type}.bin')
+    default_dst = os.path.join(build_dir, f'{PRODUCT_NAME}-{device_type}.bin')
     _copy_artifact(src, default_dst)
 
     if _is_rc_artifact_build(env):
@@ -144,7 +135,7 @@ def rename_firmware(source, target, env):
 
     release_version = _get_release_version(env)
     if release_version:
-        release_dst = os.path.join(build_dir, f'firmware-{device_type}-{release_version}.bin')
+        release_dst = os.path.join(build_dir, f'{PRODUCT_NAME}-{device_type}-{release_version}.bin')
         _copy_artifact(src, release_dst)
 
 

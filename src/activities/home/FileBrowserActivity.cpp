@@ -463,7 +463,7 @@ void FileBrowserActivity::promptDeleteFile(const std::string& fullPath, const st
   };
 
   const std::string heading = tr(STR_DELETE) + std::string("? ");
-  startActivityForResult(std::make_unique<ConfirmationActivity>(renderer, mappedInput, heading, entry), handler);
+  startActivityForResult(makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, heading, entry), handler);
 }
 
 void FileBrowserActivity::promptDeleteDirectory(const std::string& fullPath, const std::string& entry,
@@ -515,7 +515,7 @@ void FileBrowserActivity::promptDeleteDirectory(const std::string& fullPath, con
 
   const std::string heading = tr(STR_DELETE) + std::string("? ");
   startActivityForResult(
-      std::make_unique<ConfirmationActivity>(renderer, mappedInput, heading, entry, ignoreInitialConfirmRelease),
+      makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, heading, entry, ignoreInitialConfirmRelease),
       handler);
 }
 
@@ -527,8 +527,8 @@ void FileBrowserActivity::showDirectoryActionMenu(const std::string& entry, bool
                    useDefaultFolders ? StrId::STR_USE_DEFAULT_SLEEP_FOLDERS : StrId::STR_SET_AS_SLEEP_FOLDER});
   items.push_back({FileBrowserAction::Delete, StrId::STR_DELETE});
 
-  startActivityForResult(std::make_unique<FileBrowserActionActivity>(renderer, mappedInput, getFileName(entry),
-                                                                     std::move(items), ignoreInitialConfirmRelease),
+  startActivityForResult(makeUniqueNoThrow<FileBrowserActionActivity>(renderer, mappedInput, getFileName(entry),
+                                                                      std::move(items), ignoreInitialConfirmRelease),
                          [this, fullPath, entry](const ActivityResult& result) {
                            longPressConfirmHandled = false;
                            if (result.isCancelled) {
@@ -697,8 +697,8 @@ void FileBrowserActivity::showFileActionMenu(const std::string& entry, bool igno
   }
 
   startActivityForResult(
-      std::make_unique<FileBrowserActionActivity>(renderer, mappedInput, getFileName(entry), std::move(items),
-                                                  ignoreInitialConfirmRelease),
+      makeUniqueNoThrow<FileBrowserActionActivity>(renderer, mappedInput, getFileName(entry), std::move(items),
+                                                   ignoreInitialConfirmRelease),
       [this, fullPath, entry](const ActivityResult& result) {
         longPressConfirmHandled = false;
         if (result.isCancelled) {
@@ -717,7 +717,7 @@ void FileBrowserActivity::showFileActionMenu(const std::string& entry, bool igno
             promptDeleteFile(fullPath, entry);
             return;
           case FileBrowserAction::DeleteCache:
-            startActivityForResult(std::make_unique<ConfirmationActivity>(
+            startActivityForResult(makeUniqueNoThrow<ConfirmationActivity>(
                                        renderer, mappedInput, BookActions::confirmationHeading(StrId::STR_DELETE_CACHE),
                                        getFileName(entry)),
                                    [this, fullPath](const ActivityResult& confirmation) {
@@ -734,9 +734,9 @@ void FileBrowserActivity::showFileActionMenu(const std::string& entry, bool igno
             return;
           case FileBrowserAction::DeleteStats:
             startActivityForResult(
-                std::make_unique<ConfirmationActivity>(renderer, mappedInput,
-                                                       BookActions::confirmationHeading(StrId::STR_DELETE_BOOK_STATS),
-                                                       getFileName(entry)),
+                makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput,
+                                                        BookActions::confirmationHeading(StrId::STR_DELETE_BOOK_STATS),
+                                                        getFileName(entry)),
                 [this, fullPath](const ActivityResult& confirmation) {
                   if (!confirmation.isCancelled) {
                     if (!BookActions::deleteBookStats(fullPath)) {
@@ -751,7 +751,7 @@ void FileBrowserActivity::showFileActionMenu(const std::string& entry, bool igno
             return;
           case FileBrowserAction::ResetReaderSettings:
             startActivityForResult(
-                std::make_unique<ConfirmationActivity>(
+                makeUniqueNoThrow<ConfirmationActivity>(
                     renderer, mappedInput, BookActions::confirmationHeading(StrId::STR_RESET_BOOK_READER_SETTINGS),
                     getFileName(entry)),
                 [this, fullPath](const ActivityResult& confirmation) {
@@ -782,9 +782,9 @@ void FileBrowserActivity::showFileActionMenu(const std::string& entry, bool igno
             const uint8_t currentIndex =
                 BookActions::epubRenderModeDisplayIndex(EpubReaderActivity::loadBookRenderMode(fullPath));
             startActivityForResult(
-                std::make_unique<OptionSelectionActivity>(renderer, mappedInput, "EpubRenderModeSelect",
-                                                          StrId::STR_EPUB_RENDER_MODE,
-                                                          BookActions::epubRenderModeOptions(), currentIndex),
+                makeUniqueNoThrow<OptionSelectionActivity>(renderer, mappedInput, "EpubRenderModeSelect",
+                                                           StrId::STR_EPUB_RENDER_MODE,
+                                                           BookActions::epubRenderModeOptions(), currentIndex),
                 [this, fullPath](const ActivityResult& selectionResult) {
                   if (!selectionResult.isCancelled) {
                     const auto* selection = std::get_if<OptionSelectionResult>(&selectionResult.data);
@@ -801,7 +801,7 @@ void FileBrowserActivity::showFileActionMenu(const std::string& entry, bool igno
           case FileBrowserAction::PinFavorite:
             if (FsHelpers::hasPngExtension(fullPath)) {
               startActivityForResult(
-                  std::make_unique<ConfirmationActivity>(renderer, mappedInput, "", tr(STR_PIN_PNG_WARNING)),
+                  makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, "", tr(STR_PIN_PNG_WARNING)),
                   [this, fullPath](const ActivityResult& confirmation) {
                     if (!confirmation.isCancelled) {
                       pinSleepFavorite(fullPath);

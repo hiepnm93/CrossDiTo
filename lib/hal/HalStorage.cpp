@@ -2,6 +2,7 @@
 #include "HalStorage.h"
 
 #include <Arduino.h>
+#include <BoardConfig.h>
 #include <FS.h>  // need to be included before SdFat.h for compatibility with FS.h's File class
 #include <HalClock.h>
 #include <Logging.h>
@@ -34,6 +35,8 @@ constexpr uint8_t kFallbackDay = 1;
 constexpr uint8_t kFallbackHour = 0;
 constexpr uint8_t kFallbackMinute = 0;
 const uint8_t* clockUtcOffsetQ = nullptr;
+
+bool storageUsesSharedSpiBus() { return BoardConfig::ACTIVE.sdmmc.busWidth == 0; }
 
 bool isLeapYear(const uint16_t year) { return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0; }
 
@@ -131,7 +134,19 @@ HalStorage::~HalStorage() = default;
 // begin() and ready() are only called from setup, no need to acquire mutex for them
 
 bool HalStorage::begin() {
-  HalSpiBus::Lock spiLock;
+  if (!storageMutex) {
+    storageMutex = xSemaphoreCreateMutex();
+    if (!storageMutex) {
+      LOG_ERR("SD", "Failed to create storage mutex");
+      return false;
+    }
+  }
+  const bool usesSharedSpi = storageUsesSharedSpiBus();
+  HalSpiBus::Lock spiLock(usesSharedSpi);
+  if (usesSharedSpi && !spiLock) {
+    LOG_ERR("SD", "Shared SPI bus lock is unavailable");
+    return false;
+  }
   return SDCard.begin();
 }
 
@@ -212,11 +227,21 @@ UsbDriveState HalStorage::usbDriveState() const {
 
 class HalStorage::StorageLock {
  public:
-  StorageLock() : spiLock() { xSemaphoreTake(HalStorage::getInstance().storageMutex, portMAX_DELAY); }
-  ~StorageLock() { xSemaphoreGive(HalStorage::getInstance().storageMutex); }
+  StorageLock() : spiLock(storageUsesSharedSpiBus()) {
+    auto mutex = HalStorage::getInstance().storageMutex;
+    if (mutex && xSemaphoreTake(mutex, portMAX_DELAY) == pdTRUE) {
+      acquired = true;
+    } else {
+      LOG_ERR("SD", "Storage mutex is unavailable");
+    }
+  }
+  ~StorageLock() {
+    if (acquired) xSemaphoreGive(HalStorage::getInstance().storageMutex);
+  }
 
  private:
   HalSpiBus::Lock spiLock;
+  bool acquired = false;
 };
 
 #define HAL_STORAGE_WRAPPED_CALL(method, ...) \

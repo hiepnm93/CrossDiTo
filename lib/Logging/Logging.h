@@ -6,7 +6,9 @@
 #include <string>
 
 /*
-Define ENABLE_SERIAL_LOG to enable logging
+Define ENABLE_SERIAL_LOG to enable live serial logging.
+Define ENABLE_RTC_LOG to keep the compact RTC crash-log ring without writing
+logs to the serial transport.
 Can be set in platformio.ini build_flags or as a compile definition
 
 Define LOG_LEVEL to control log verbosity:
@@ -33,7 +35,7 @@ static auto& logSerial = BoardConfig::serialTransport();
 
 void logPrintf(const char* level, const char* origin, const char* format, ...);
 
-#ifdef ENABLE_SERIAL_LOG
+#if defined(ENABLE_SERIAL_LOG) || defined(ENABLE_RTC_LOG)
 #if LOG_LEVEL >= 0
 #define LOG_ERR(origin, format, ...) logPrintf("ERR", origin, format "\n", ##__VA_ARGS__)
 #else
@@ -56,6 +58,15 @@ void logPrintf(const char* level, const char* origin, const char* format, ...);
 #define LOG_ERR(origin, format, ...)
 #define LOG_INF(origin, format, ...)
 #endif
+
+// USB serial is also used by the browser file-transfer protocol. Release
+// builds schedule it after the early boot path so USB enumeration never adds a
+// fixed startup stall; debug builds may start it synchronously for early logs.
+void scheduleLogSerialTransportStart(unsigned long delayMs);
+void beginLogSerialTransportNow();
+void serviceLogSerialTransport();
+void endLogSerialTransport();
+bool isLogSerialTransportStarted();
 
 std::string getLastLogs();
 void clearLastLogs();

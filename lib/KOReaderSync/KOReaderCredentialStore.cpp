@@ -4,6 +4,8 @@
 #include <MD5Builder.h>
 #include <ObfuscationUtils.h>
 
+#include <utility>
+
 namespace {
 // Default sync server URL. crosspoint-sync speaks the full KOSync protocol, so
 // pointing at any other kosync server (e.g. https://sync.koreader.rocks:443)
@@ -17,6 +19,27 @@ constexpr char LEGACY_DEFAULT_SERVER_URL[] = "https://sync.koreader.rocks:443";
 // Bumped when a change to defaults would alter behavior for existing configs.
 constexpr uint8_t CONFIG_VERSION = 2;
 }  // namespace
+
+void KOReaderCredentialStore::ensureLoaded() const {
+  if (loadState.load(std::memory_order_acquire) == 2) return;
+  const_cast<KOReaderCredentialStore*>(this)->loadFromFile();
+}
+
+bool KOReaderCredentialStore::loadFromFile() {
+  uint8_t expected = 0;
+  if (loadState.compare_exchange_strong(expected, 1, std::memory_order_acq_rel)) {
+    loadSucceeded = PersistableStore<KOReaderCredentialStore>::loadFromFile();
+    loadState.store(2, std::memory_order_release);
+    return loadSucceeded;
+  }
+  while (loadState.load(std::memory_order_acquire) == 1) delay(1);
+  return loadSucceeded;
+}
+
+bool KOReaderCredentialStore::saveToFile() const {
+  ensureLoaded();
+  return PersistableStore<KOReaderCredentialStore>::saveToFile();
+}
 
 void KOReaderCredentialStore::toJson(JsonDocument& doc) const {
   doc["cfgVersion"] = CONFIG_VERSION;
@@ -47,8 +70,9 @@ bool KOReaderCredentialStore::fromJson(JsonVariantConst doc) {
     LOG_ERR("KRS", "Ignoring unreadable KOReader password");
   }
 
-  setCredentials(user, pass);
-  setServerUrl(doc["serverUrl"] | "");
+  username = std::move(user);
+  password = std::move(pass);
+  serverUrl = doc["serverUrl"] | "";
 
   // The default server changed in config v2 (sync.koreader.rocks -> crosspoint-sync).
   // A pre-v2 config with credentials and no explicit URL was actively syncing
@@ -56,31 +80,31 @@ bool KOReaderCredentialStore::fromJson(JsonVariantConst doc) {
   // out from under the user. Fresh setups get the new default.
   const uint8_t cfgVersion = doc["cfgVersion"] | (uint8_t)1;
   if (cfgVersion < CONFIG_VERSION) {
-    if (getServerUrl().empty() && hasCredentials()) {
+    if (serverUrl.empty() && !username.empty() && !password.empty()) {
       LOG_DBG("KRS", "Pre-v2 config used the old default server; pinning %s", LEGACY_DEFAULT_SERVER_URL);
-      setServerUrl(LEGACY_DEFAULT_SERVER_URL);
+      serverUrl = LEGACY_DEFAULT_SERVER_URL;
     }
     needsResave = true;  // stamp cfgVersion so this migration runs once
   }
 
   uint8_t method = doc["matchMethod"] | (uint8_t)0;
   if (method <= static_cast<uint8_t>(DocumentMatchMethod::BINARY)) {
-    setMatchMethod(static_cast<DocumentMatchMethod>(method));
+    matchMethod = static_cast<DocumentMatchMethod>(method);
   } else {
     LOG_DBG("KRS", "Invalid matchMethod %u in JSON, resetting to FILENAME", method);
-    setMatchMethod(DocumentMatchMethod::FILENAME);
+    matchMethod = DocumentMatchMethod::FILENAME;
   }
-  setSendMetadata(doc["sendMetadata"] | false);
+  sendMetadata = doc["sendMetadata"] | false;
 
   const JsonVariantConst behaviorValue = doc["syncBehavior"];
   const bool missingBehavior = behaviorValue.isNull();
   uint8_t behavior = behaviorValue | static_cast<uint8_t>(KOReaderSyncBehavior::ASK_EVERY_TIME);
   if (behavior <= static_cast<uint8_t>(KOReaderSyncBehavior::SMART)) {
-    setSyncBehavior(static_cast<KOReaderSyncBehavior>(behavior));
+    syncBehavior = static_cast<KOReaderSyncBehavior>(behavior);
     needsResave = needsResave || missingBehavior;
   } else {
     LOG_DBG("KRS", "Invalid syncBehavior %u in JSON, resetting to ASK_EVERY_TIME", behavior);
-    setSyncBehavior(KOReaderSyncBehavior::ASK_EVERY_TIME);
+    syncBehavior = KOReaderSyncBehavior::ASK_EVERY_TIME;
     needsResave = true;
   }
 
@@ -96,6 +120,16 @@ void KOReaderCredentialStore::setCredentials(const std::string& user, const std:
   ensureLoaded();
   username = user;
   password = pass;
+}
+
+const std::string& KOReaderCredentialStore::getUsername() const {
+  ensureLoaded();
+  return username;
+}
+
+const std::string& KOReaderCredentialStore::getPassword() const {
+  ensureLoaded();
+  return password;
 }
 
 std::string KOReaderCredentialStore::getMd5Password() const {
@@ -118,9 +152,21 @@ bool KOReaderCredentialStore::hasCredentials() const {
   return !username.empty() && !password.empty();
 }
 
+void KOReaderCredentialStore::clearCredentials() {
+  ensureLoaded();
+  username.clear();
+  password.clear();
+  saveToFile();
+}
+
 void KOReaderCredentialStore::setServerUrl(const std::string& url) {
   ensureLoaded();
   serverUrl = url;
+}
+
+const std::string& KOReaderCredentialStore::getServerUrl() const {
+  ensureLoaded();
+  return serverUrl;
 }
 
 std::string KOReaderCredentialStore::getBaseUrl() const {
@@ -150,9 +196,19 @@ void KOReaderCredentialStore::setMatchMethod(DocumentMatchMethod method) {
   matchMethod = method;
 }
 
+DocumentMatchMethod KOReaderCredentialStore::getMatchMethod() const {
+  ensureLoaded();
+  return matchMethod;
+}
+
 void KOReaderCredentialStore::setSendMetadata(bool enabled) {
   ensureLoaded();
   sendMetadata = enabled;
+}
+
+bool KOReaderCredentialStore::getSendMetadata() const {
+  ensureLoaded();
+  return sendMetadata;
 }
 
 void KOReaderCredentialStore::setSyncBehavior(KOReaderSyncBehavior behavior) {
@@ -161,4 +217,9 @@ void KOReaderCredentialStore::setSyncBehavior(KOReaderSyncBehavior behavior) {
     behavior = KOReaderSyncBehavior::ASK_EVERY_TIME;
   }
   syncBehavior = behavior;
+}
+
+KOReaderSyncBehavior KOReaderCredentialStore::getSyncBehavior() const {
+  ensureLoaded();
+  return syncBehavior;
 }

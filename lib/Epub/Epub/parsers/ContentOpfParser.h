@@ -44,6 +44,8 @@ class ContentOpfParser final : public Print {
     uint16_t idLen;       // length for collision reduction
     uint32_t fileOffset;  // offset in .items.bin
   };
+  // One chunk fits inside the arena's 4 KB slab. Fixed chunks avoid the
+  // alloc-copy growth pattern whose old buffers an arena cannot reclaim.
   static constexpr size_t ITEM_INDEX_CHUNK_CAPACITY = 240;
   struct ItemIndexChunk {
     ItemIndexChunk* next = nullptr;

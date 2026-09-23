@@ -98,7 +98,7 @@ void OtaUpdateActivity::onEnter() {
   WiFi.mode(WIFI_STA);
 
   // Launch WiFi selection subactivity
-  startActivityForResult(std::make_unique<WifiSelectionActivity>(renderer, mappedInput),
+  startActivityForResult(makeUniqueNoThrow<WifiSelectionActivity>(renderer, mappedInput),
                          [this](const ActivityResult& result) { onWifiSelectionComplete(!result.isCancelled); });
 }
 

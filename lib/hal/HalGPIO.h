@@ -2,8 +2,14 @@
 
 #include <Arduino.h>
 #include <InputManager.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 #include "AppCapabilities.h"
+
+#ifndef CROSSDITO_INPUT_IDLE_WAIT
+#define CROSSDITO_INPUT_IDLE_WAIT 0
+#endif
 
 // Display SPI pins (custom pins for XteinkX4, not hardware SPI defaults)
 #define EPD_SCLK 8   // SPI Clock
@@ -22,6 +28,14 @@
 class HalGPIO {
 #if CROSSPOINT_EMULATED == 0
   InputManager inputMgr;
+#if CROSSDITO_INPUT_IDLE_WAIT
+  // Fixed storage avoids heap churn and remains in internal DRAM so the ISR
+  // can safely signal it while flash cache or PSRAM are unavailable.
+  StaticSemaphore_t inputWakeSemaphoreStorage{};
+  SemaphoreHandle_t inputWakeSemaphore = nullptr;
+  static void IRAM_ATTR signalInputWake(void* context);
+  void attachInputWakeInterrupts();
+#endif
 #endif
 
   bool lastUsbConnected = false;
@@ -90,6 +104,11 @@ class HalGPIO {
 
   // Button input methods
   void update();
+  // Block the main task until an input edge or timeout. This gives FreeRTOS a
+  // real idle window for dynamic frequency scaling and automatic light sleep.
+  void waitForActivity(unsigned long timeoutMs);
+  // Earliest mandatory input-service deadline if no GPIO edge arrives.
+  unsigned long nextInputServiceDelayMs(unsigned long maxDelayMs) const;
   bool isPressed(uint8_t buttonIndex) const;
   bool wasPressed(uint8_t buttonIndex) const;
   bool wasAnyPressed() const;
@@ -116,6 +135,7 @@ class HalGPIO {
   // drag-off). Snapshot builders forward it so interaction routing can clear
   // pressed state.
   bool wasTouchReleased() const;
+  void suppressTouchContact();
   bool isTouchTapCandidate(float& nx, float& ny, unsigned long& heldMs) const;
   bool wasTouchLongPress(float& nx, float& ny) const;
   void suppressTouchContact();

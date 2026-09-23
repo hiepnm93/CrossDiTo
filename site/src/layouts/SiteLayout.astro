@@ -2,6 +2,7 @@
 import '../styles/site.css';
 import '@fontsource-variable/jetbrains-mono';
 import { getDocs } from '../lib/docs';
+import { withBase } from '../lib/paths';
 
 type Props = {
   title?: string;
@@ -10,9 +11,10 @@ type Props = {
 };
 
 const docs = await getDocs();
-const { title = 'CrossInk', description = 'CrossInk firmware documentation', pageClass = '' } = Astro.props;
-const pageTitle = title === 'CrossInk' ? title : `${title} | CrossInk`;
+const { title = 'CrossDiTo', description = 'CrossDiTo firmware documentation', pageClass = '' } = Astro.props;
+const pageTitle = title === 'CrossDiTo' ? title : `${title} | CrossDiTo`;
 const currentDoc = docs.find((doc) => Astro.url.pathname === doc.url);
+const homeUrl = withBase();
 ---
 
 <!doctype html>
@@ -32,7 +34,7 @@ const currentDoc = docs.find((doc) => Astro.url.pathname === doc.url);
       })();
     </script>
     <meta name="description" content={description} />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
+    <link rel="icon" type="image/svg+xml" href={`${withBase('favicon.svg')}?v=3`} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..900&display=swap" rel="stylesheet" />
@@ -40,19 +42,19 @@ const currentDoc = docs.find((doc) => Astro.url.pathname === doc.url);
   </head>
   <body class={pageClass}>
     <header class="site-header">
-      <a class="brand" href="/">
-        <img class="brand-mark" src="/logo.png" alt="" aria-hidden="true" />
+      <a class="brand" href={homeUrl}>
+        <img class="brand-mark" src={withBase('logo.png')} alt="" aria-hidden="true" />
         <span>
-          <strong>CrossInk</strong>
+          <strong>CrossDiTo</strong>
           <small>E-reader Firmware</small>
         </span>
       </a>
       <nav class="top-nav" aria-label="Primary navigation">
-        <a href="/docs.html">Docs</a>
-        <a href="/installation.html">Install</a>
-        <a href="/reader-features.html">Features</a>
+        <a href={withBase('docs.html')}>Docs</a>
+        <a href={withBase('installation.html')}>Install</a>
+        <a href={withBase('reader-features.html')}>Features</a>
         <a href="https://inky.crossink.dev">Inky</a>
-        <a href="https://github.com/uxjulia/CrossInk">GitHub</a>
+        <a href="https://github.com/dito94/CrossDiTo">GitHub</a>
         <button type="button" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">
           <svg
             class="icon-moon"

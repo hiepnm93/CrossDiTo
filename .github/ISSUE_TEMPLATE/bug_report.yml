@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to report this bug! Please fill out the details below. If you have a feature request, please use the [Discussions](https://github.com/uxjulia/CrossInk/discussions/categories/ideas) feature so that issues focuses only on immediate bugs.
+        Thanks for taking the time to report this bug! Please fill out the details below. For a feature request, open a separate issue and explain the concrete reader benefit so CrossDiTo can stay focused.
 
   - type: dropdown
     id: device-type
@@ -15,11 +15,7 @@ body:
       description: Which device is this affecting?
       options:
         - "--- Select ---"
-        - X4
-        - X3
-        - X4 Pro
-        - X4 Classic
-        - Seeed Sticky
+        - Xteink X4 Pro
     validations:
       required: true
 
@@ -93,12 +89,12 @@ body:
     id: epub-attachment
     attributes:
       label: File Provided
-      description: If your issue is related to a specific file (EPUB, XTC, etc.), please make sure to attach the exact file in this ticket or email it to julia@uxj.io and reference your issue number. **_EPUBs and XTC files need to be zipped to be attached._**
+      description: If your issue is related to a specific file (EPUB, XTC, etc.), attach the exact file to this ticket when you are legally able to share it. **_EPUBs and XTC files need to be zipped to be attached._**
       options:
         - "--- Select ---"
         - Not Applicable
         - I've attached it
-        - I've emailed it
+        - I cannot share the file
     validations:
       required: true
 

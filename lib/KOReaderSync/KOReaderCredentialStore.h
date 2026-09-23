@@ -2,6 +2,7 @@
 #include <ArduinoJson.h>
 #include <PersistableStore.h>
 
+#include <atomic>
 #include <cstdint>
 #include <string>
 
@@ -32,6 +33,9 @@ class KOReaderCredentialStore : public PersistableStore<KOReaderCredentialStore>
   DocumentMatchMethod matchMethod = DocumentMatchMethod::FILENAME;  // Default to filename for compatibility
   bool sendMetadata = false;                                        // Send document metadata with progress sync
   KOReaderSyncBehavior syncBehavior = KOReaderSyncBehavior::SMART;
+  mutable std::atomic<uint8_t> loadState{0};  // 0=not loaded, 1=loading, 2=ready
+  bool loadSucceeded = false;
+  void ensureLoaded() const;
 
   // Private constructor for singleton
   KOReaderCredentialStore() = default;
@@ -43,6 +47,8 @@ class KOReaderCredentialStore : public PersistableStore<KOReaderCredentialStore>
   static const char* getFilePath() { return "/.crosspoint/koreader.json"; }
   void toJson(JsonDocument& doc) const;
   bool fromJson(JsonVariantConst doc);
+  bool loadFromFile();
+  bool saveToFile() const;
 
   // Credential management
   void setCredentials(const std::string& user, const std::string& pass);

@@ -1,3 +1,5 @@
+import { withBase } from "./paths";
+
 type DocModule = {
   frontmatter: {
     title?: string;
@@ -59,7 +61,7 @@ function slugFromPath(path: string) {
 }
 
 function urlFromSlug(slug: string) {
-  return `/${slug}.html`;
+  return withBase(`${slug}.html`);
 }
 
 async function getEntries(sourceModules: typeof modules): Promise<DocEntry[]> {

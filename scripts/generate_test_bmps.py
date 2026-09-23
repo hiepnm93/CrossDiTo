@@ -161,7 +161,7 @@ def generate_1bit(path):
 
 
 def generate_2bit(path):
-    """2-bit BMP: 4-level grayscale test pattern (non-standard, CrossPoint extension)."""
+    """2-bit BMP: 4-level grayscale test pattern (non-standard, CrossDiTo extension)."""
     bpp = 2
     palette = GRAY_LEVELS
     row_bytes = (WIDTH * bpp + 31) // 32 * 4
@@ -318,7 +318,7 @@ def main():
     print("  8-bit (256 colors): Same layout but with intermediate grays, WITH dithering")
     print("  24-bit: Same layout but with intermediate grays, WITH dithering")
     print()
-    print("Note: 2-bit BMP is a non-standard CrossPoint extension. Standard image viewers")
+    print("Note: 2-bit BMP is a non-standard CrossDiTo extension. Standard image viewers")
     print("will not open it. Use the 4-bit BMP instead for images created with standard tools")
     print("(e.g. ImageMagick: convert input.png -colorspace Gray -colors 4 -depth 4 BMP3:output.bmp)")
     print()

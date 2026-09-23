@@ -9,7 +9,7 @@ const docsDir = fileURLToPath(new URL("../docs", import.meta.url));
 
 function watchExternalDocs() {
   return {
-    name: "crossink:watch-external-docs",
+    name: "crossdito:watch-external-docs",
     apply: "serve",
     configureServer(server) {
       server.watcher.add(docsDir);
@@ -29,7 +29,7 @@ function rewriteMarkdownLinks() {
       }
 
       const rootDocUrl = node.url
-        .replace(/^(\.\.\/)+SCOPE\.md(#.*)?$/i, "https://github.com/uxjulia/CrossInk/blob/main/SCOPE.md$2")
+        .replace(/^(\.\.\/)+SCOPE\.md(#.*)?$/i, "https://github.com/dito94/CrossDiTo/blob/main/SCOPE.md$2")
         .replace(/^(\.\.\/)+GOVERNANCE\.md(#.*)?$/i, "https://github.com/uxjulia/CrossInk/blob/main/GOVERNANCE.md$2");
       if (rootDocUrl !== node.url) {
         node.url = rootDocUrl;
@@ -52,6 +52,8 @@ function visit(node, visitor) {
 }
 
 export default defineConfig({
+  site: "https://dito94.github.io",
+  base: "/CrossDiTo",
   build: {
     format: "file",
   },
@@ -61,5 +63,4 @@ export default defineConfig({
   vite: {
     plugins: [watchExternalDocs()],
   },
-  site: "https://www.crossink.dev",
 });

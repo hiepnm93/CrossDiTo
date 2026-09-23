@@ -118,7 +118,7 @@ enterNewActivity(new SettingsActivity(renderer, mappedInput, onGoHome));
 // AFTER (from any Activity method)
 activityManager.goToSettings();
 // or for arbitrary navigation:
-activityManager.replaceActivity(std::make_unique<MyActivity>(renderer, mappedInput));
+activityManager.replaceActivity(makeUniqueNoThrow<MyActivity>(renderer, mappedInput));
 ```
 
 `replaceActivity()` destroys the current activity and clears the stack. Use it for top-level navigation (home, reader, settings, etc.).
@@ -138,7 +138,7 @@ void MyActivity::launchWifi() {
 // AFTER
 void MyActivity::launchWifi() {
   startActivityForResult(
-      std::make_unique<WifiSelectionActivity>(renderer, mappedInput),
+      makeUniqueNoThrow<WifiSelectionActivity>(renderer, mappedInput),
       [this](const ActivityResult& result) {
         if (result.isCancelled) return;
         auto& wifi = std::get<WifiResult>(result.data);
@@ -249,7 +249,7 @@ This removes `std::function` overhead (~2-4KB per unique signature) and eliminat
 
 ### FreeRTOS Task Model
 
-The firmware runs on an ESP32-C3, a single-core RISC-V microcontroller. FreeRTOS provides cooperative and preemptive multitasking on this single core — only one task executes at any moment, and the scheduler switches between tasks at yield points (blocking calls, `vTaskDelay`, `taskYIELD`) or when a tick interrupt promotes a higher-priority task.
+The firmware runs on the X4 Pro's dual-core ESP32-S3. Application rendering is pinned to core 1 so core 0 remains available for system and radio work; FreeRTOS schedules the Arduino main task and render task independently while the render mutex protects their shared activity state.
 
 There are two tasks relevant to the activity system:
 
@@ -269,7 +269,7 @@ There are two tasks relevant to the activity system:
 └──────────────────────┘     └──────────────────────────┘
 ```
 
-Both tasks run at priority 1. Since the ESP32-C3 is single-core, they alternate execution: the main task runs `loop()`, then at the end of the loop iteration, notifies the render task if an update was requested. The render task wakes, acquires the mutex, calls `render()`, releases the mutex, and blocks again.
+Both tasks run at priority 1. The main task requests an update at the end of its loop iteration. The render task then wakes, acquires the mutex, calls `render()`, releases the mutex, and blocks again. Code must still use `RenderLock`; task scheduling details are not a substitute for synchronization.
 
 Do not use `xTaskCreate` inside activities. If you have a use case that seems to require a background task, open a discussion to propose a lifecycle-aware `Worker` abstraction first.
 

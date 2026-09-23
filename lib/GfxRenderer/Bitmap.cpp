@@ -17,14 +17,6 @@
 constexpr bool USE_ATKINSON = true;  // Use Atkinson dithering instead of Floyd-Steinberg
 // ============================================================================
 
-Bitmap::~Bitmap() {
-  delete[] errorCurRow;
-  delete[] errorNextRow;
-
-  delete atkinsonDitherer;
-  delete fsDitherer;
-}
-
 uint16_t Bitmap::readLE16(HalFile& f) {
   const int c0 = f.read();
   const int c1 = f.read();
@@ -80,6 +72,8 @@ const char* Bitmap::errorToString(BmpReaderError err) {
 
     case BmpReaderError::OomRowBuffer:
       return "OomRowBuffer";
+    case BmpReaderError::OomDitherBuffer:
+      return "OomDitherBuffer";
     case BmpReaderError::ShortReadRow:
       return "ShortReadRow";
   }
@@ -173,6 +167,8 @@ BmpReaderError Bitmap::parseHeaders() {
   //  - High-color + dithering enabled → error-diffusion dithering (Atkinson or Floyd-Steinberg)
   //  - High-color + dithering disabled → simple quantization (no error diffusion)
   const bool highColor = !nativePalette;
+  atkinsonDitherer.reset();
+  fsDitherer.reset();
   if (highColor && dithering) {
     if (USE_ATKINSON) {
       atkinsonDitherer = new (std::nothrow) AtkinsonDitherer(width, imageLevels);

@@ -6,7 +6,11 @@
 
 inline bool deviceHasEdgeSideButtons(const HalGPIO& gpio) {
 #ifdef SIMULATOR
+#ifdef SIMULATOR_DEVICE_X4_PRO
+  return true;
+#else
   return gpio.deviceIsX3();
+#endif
 #else
   return gpio.hasEdgeSideButtons();
 #endif

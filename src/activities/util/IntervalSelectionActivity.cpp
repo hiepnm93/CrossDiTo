@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <utility>
 
+#include "CrossPointSettings.h"
 #include "DeviceCapabilities.h"
 #include "components/SliderValue.h"
 #include "components/TouchActionButtons.h"
@@ -18,6 +19,7 @@
 #include "components/UiAppHelpers.h"
 #endif
 #include "fontIds.h"
+#include "util/FrontlightSchedule.h"
 
 #if CROSSINK_APP_CAP_TOUCH
 namespace fui = freeink::ui;
@@ -297,7 +299,10 @@ void IntervalSelectionActivity::adjustValue(const int delta) {
 
 void IntervalSelectionActivity::drawStepHintLine(const int y, const StrId labelId, const int step) {
   char stepText[24];
-  if (valueFormatId != StrId::STR_NONE_OPT) {
+  if (showClockTimeValue) {
+    const int minutes = step * FrontlightSchedule::SLOT_MINUTES;
+    snprintf(stepText, sizeof(stepText), "%02d:%02d", minutes / 60, minutes % 60);
+  } else if (valueFormatId != StrId::STR_NONE_OPT) {
     snprintf(stepText, sizeof(stepText), I18N.get(valueFormatId), static_cast<unsigned int>(step));
   } else {
     snprintf(stepText, sizeof(stepText), "%d", step);

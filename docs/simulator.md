@@ -5,17 +5,11 @@ nav_order: 15
 
 # Development Device Simulator
 
-CrossInk can run in the [CrossPoint simulator](https://github.com/uxjulia/crosspoint-simulator), which renders the e-ink display in an SDL2 window. Use it for quick sanity checks without flashing firmware every time.
+CrossDiTo can run in the [device simulator](https://github.com/uxjulia/crossink-simulator), which renders the X4 Pro display in an SDL2 window. Use it for quick sanity checks without flashing firmware every time.
 
 ## Platform Support
 
-The simulator is currently configured for macOS on Apple Silicon.
-
-The `platformio.ini` `[env:simulator]` section contains hardcoded `-arch arm64` and Homebrew paths under `/opt/homebrew`.
-
-- Intel Mac users need to remove `-arch arm64` and change Homebrew paths to `/usr/local`.
-- Linux requires similar path changes plus a replacement for `lib/simulator_mock/src/MD5Builder.h`, which uses the macOS-only `CommonCrypto` API.
-- Native Windows is not supported. Use WSL and follow the Linux adjustments.
+The native build uses `sdl2-config`, so SDL2 must be installed and available in `PATH`. macOS and Linux are the primary supported hosts; Windows users should use WSL.
 
 ## Prerequisites
 
@@ -34,13 +28,6 @@ Place EPUB books in `./fs_/books/` relative to the project root. That maps to th
 ## Build And Run
 
 ```sh
-pio run -e simulator
-.pio/build/simulator/program
-```
-
-Use the X4 Pro environment to enable its touch, frontlight, and Home-key behavior:
-
-```sh
 pio run -e x4-pro-simulator -t run_simulator
 ```
 
@@ -55,7 +42,7 @@ pio run -e x4-pro-simulator -t run_simulator
 | P | Power |
 | H | X4 Pro Home key (tap to go Home; hold for 700 ms to toggle the reader menu) |
 
-The `H` mapping is active only in `x4-pro-simulator`.
+The simulator always uses the X4 Pro capability profile.
 
 ## Cache Note
 

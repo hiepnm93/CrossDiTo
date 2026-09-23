@@ -1,14 +1,13 @@
 """
 PlatformIO pre-build script: inject git info into version defines.
 
-  default:       1.1.0-dev+<branch>  (local development builds)
-  production:    1.1.0               (when $CROSSINK_RELEASE_VERSION is set)
-  RC:            1.1.0-<hash>-RC      (when $CROSSINK_RC_HASH is set)
-  test & debug:          1.2.6-<branch>+<5-char-hash>
-  gh_release_rc: 1.1.0-<hash>-RC       (hash from $CROSSINK_RC_HASH in CI,
-                                        or from git locally)
+  x4-pro:          1.1.0-dev+<branch>         (local development build)
+  x4-pro-debug:    1.1.0-debug-<branch>+<hash>
+  production:      1.1.0                      (when $CROSSINK_RELEASE_VERSION is set)
+  release candidate: 1.1.0-rc+<hash>
 
-Simulator environments set CROSSINK_VERSION directly in platformio.ini.
+The X4 Pro simulator sets CROSSINK_VERSION directly in platformio.ini. The
+legacy macro name is retained for source and settings compatibility.
 """
 
 import configparser
@@ -116,11 +115,11 @@ def _read_ini(project_dir):
     return config
 
 
-def get_crossink_version(project_dir):
+def get_crossdito_version(project_dir):
     config = _read_ini(project_dir)
-    if not config.has_option('crossink', 'version'):
+    if not config.has_option('crossdito', 'version'):
         warn(
-            'No [crossink] version in platformio.ini or platformio.local.ini; '
+            'No [crossdito] version in platformio.ini or platformio.local.ini; '
             'build version will be "0.0.0"'
         )
         return '0.0.0'
@@ -137,7 +136,23 @@ def get_production_version(project_dir):
     release_version = os.environ.get('CROSSINK_RELEASE_VERSION')
     if release_version:
         return sanitize_version_component(release_version.lstrip('v'))
-    return get_crossink_version(project_dir)
+    return get_crossdito_version(project_dir)
+
+
+def get_firmware_version(project_dir, pioenv):
+    if os.environ.get('CROSSINK_RC_HASH'):
+        short_hash = sanitize_version_component(os.environ['CROSSINK_RC_HASH'])
+        return f'{get_crossdito_version(project_dir)}-rc+{short_hash}'
+    if os.environ.get('CROSSINK_RELEASE_VERSION'):
+        return get_production_version(project_dir)
+    version = get_crossdito_version(project_dir)
+    branch = get_git_branch(project_dir)
+    # Exported source snapshots intentionally have no .git directory. They are
+    # still reproducible release sources, so show the configured version rather
+    # than presenting the user with a misleading "unknown" build identity.
+    if branch == 'unknown':
+        return version
+    return f'{version}-dev+{branch}'
 
 
 def get_hardware_version(project_dir, pioenv):
@@ -181,11 +196,11 @@ def inject_version(env):
             print(f'CrossInk build version: {version_string}')
         env.Append(CPPDEFINES=[('CROSSINK_VERSION', f'\\"{version_string}\\"')])
 
-    elif pioenv == 'debug':
+    elif pioenv == 'x4-pro-debug':
         branch = get_git_branch(project_dir)
         short_hash = get_git_short_hash(project_dir)
-        ci_version = get_crossink_version(project_dir)
-        suffix = f'-{branch}+{short_hash}'
+        ci_version = get_crossdito_version(project_dir)
+        suffix = f'-debug-{branch}+{short_hash}'
         env.Append(CPPDEFINES=[
             ('CROSSINK_VERSION', f'\\"{ci_version}{suffix}\\"'),
             ('CROSSINK_BUILD_ENV', '\\"debug\\"'),
@@ -249,6 +264,6 @@ except NameError:
         _project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     else:
         _project_dir = os.getcwd()
-    inject_version(_Env({'PIOENV': 'default', 'PROJECT_DIR': _project_dir}))
+    inject_version(_Env({'PIOENV': 'x4-pro', 'PROJECT_DIR': _project_dir}))
 else:
     inject_version(env)  # noqa: F821  # type: ignore[name-defined]

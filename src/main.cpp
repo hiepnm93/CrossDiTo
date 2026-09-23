@@ -477,7 +477,7 @@ bool startGlobalSyncProgress(const bool networkBootReady, const uint8_t readerOr
 
   if (!KOREADER_STORE.hasCredentials()) {
     if (networkBootReady) return false;
-    activityManager.pushActivity(std::make_unique<KOReaderSettingsActivity>(renderer, mappedInputManager));
+    activityManager.pushActivity(makeUniqueNoThrow<KOReaderSettingsActivity>(renderer, mappedInputManager));
     return true;
   }
 
@@ -485,7 +485,7 @@ bool startGlobalSyncProgress(const bool networkBootReady, const uint8_t readerOr
   if (epubPath.empty() || !FsHelpers::hasEpubExtension(epubPath) || !Storage.exists(epubPath.c_str())) {
     if (networkBootReady) return false;
     LOG_DBG("MAIN", "No syncable EPUB open, opening KOReader settings instead");
-    activityManager.pushActivity(std::make_unique<KOReaderSettingsActivity>(renderer, mappedInputManager));
+    activityManager.pushActivity(makeUniqueNoThrow<KOReaderSettingsActivity>(renderer, mappedInputManager));
     return true;
   }
 
@@ -1126,7 +1126,10 @@ void setupDisplayAndFonts(const bool seamless, const bool loadReaderResources, c
   (void)seamless;
   display.begin();
 #else
-  display.begin(seamless);
+  if (!display.begin(seamless)) {
+    LOG_ERR("MAIN", "Display initialization failed");
+    return false;
+  }
 #endif
   renderer.begin();
   display.setInverted(SETTINGS.screenInverted != 0);
@@ -1161,6 +1164,7 @@ void setupDisplayAndFonts(const bool seamless, const bool loadReaderResources, c
   } else {
     LOG_DBG("MAIN", "Skipping EPUB scratch workspace and SD fonts for minimal network boot");
   }
+  return true;
 }
 
 void setup() {
@@ -1238,6 +1242,7 @@ void setup() {
   // configured shortcut wins; MappedInputManager mirrors it back to Confirm
   // only on screens that explicitly allow the fallback.
   gpio.setSharedConfirmPowerShortPressEmitsPower(true);
+#ifdef SIMULATOR
   powerManager.begin();
 
   const auto wakeupReason = gpio.getWakeupReason();
@@ -1353,6 +1358,7 @@ void setup() {
     }
   }
   Frontlight.begin(SETTINGS.frontlightBrightness, SETTINGS.frontlightWarmth, restoreLightOn);
+  SETTINGS.frontlightOn = Frontlight.isOn() ? 1 : 0;
 
   if (recoveryFirmwareMode) {
     LOG_INF("MAIN", "Recovery firmware mode (%s + POWER held at boot)",
@@ -1568,6 +1574,11 @@ void setup() {
 }
 
 void loop() {
+  if (fatalStartupFailure) {
+    delay(1000);
+    return;
+  }
+
   static unsigned long maxLoopDuration = 0;
   const unsigned long loopStartTime = millis();
   static unsigned long lastMemPrint = 0;
@@ -1603,10 +1614,14 @@ void loop() {
 
   renderer.setFadingFix(SETTINGS.fadingFix);
 
-  if (Serial && millis() - lastMemPrint >= 10000) {
+#ifdef ENABLE_SERIAL_LOG
+  if (isLogSerialTransportStarted() && logSerial && millis() - lastMemPrint >= 10000) {
     logMemoryStats("Periodic");
     lastMemPrint = millis();
   }
+#else
+  (void)lastMemPrint;
+#endif
 
   if (!buttonShortcutController.isQuickLocked() && UsbSerialFileTransfer::process(activityManager.isHomeActivity()) ==
                                                        UsbSerialFileTransfer::ProcessResult::ScreenshotRequested) {
@@ -1825,12 +1840,40 @@ void loop() {
     yield();                             // Give FreeRTOS a chance to run tasks, but return immediately
   } else {
     if (millis() - lastActivityTime >= HalPowerManager::IDLE_POWER_SAVING_MS) {
-      // If we've been inactive for a while, increase the delay to save power
-      powerManager.setPowerSaving(true);  // Lower CPU frequency after extended inactivity
-      delay(50);
+      // Once idle, sleep until the earliest real deadline. Physical buttons
+      // and the touch IRQ signal the semaphore and wake this task immediately.
+      powerManager.setPowerSaving(true);
+      unsigned long waitMs = activityManager.nextLoopWakeDelayMs();
+      if (waitMs > IDLE_SAFETY_HEARTBEAT_MS) waitMs = IDLE_SAFETY_HEARTBEAT_MS;
+#ifndef SIMULATOR
+      waitMs = gpio.nextInputServiceDelayMs(waitMs);
+#endif
+      waitMs = frontlightScheduleServiceDelayMs(waitMs);
+
+      if (sleepTimeoutMs > 0) {
+        const unsigned long idleElapsed = millis() - lastActivityTime;
+        const unsigned long sleepRemaining = idleElapsed >= sleepTimeoutMs ? 0UL : sleepTimeoutMs - idleElapsed;
+        if (sleepRemaining < waitMs) waitMs = sleepRemaining;
+      }
+
+      // USB transfer has no input-semaphore edge, and enabled tilt gestures
+      // are deliberately sampled at 20 Hz.
+      if (gpio.isUsbConnected() && waitMs > 50UL) waitMs = 50UL;
+      if (SETTINGS.tiltPageTurn && activityManager.isReaderActivity() && halTiltSensor.isAvailable() && waitMs > 50UL) {
+        waitMs = 50UL;
+      }
+#ifdef SIMULATOR
+      delay(waitMs);
+#else
+      gpio.waitForActivity(waitMs);
+#endif
     } else {
       // Short delay to prevent tight loop while still being responsive
+#ifdef SIMULATOR
       delay(10);
+#else
+      gpio.waitForActivity(10);
+#endif
     }
   }
 }

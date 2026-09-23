@@ -5,7 +5,7 @@ nav_order: 6
 
 # Controls
 
-The Controls menu lets you customize front buttons, side buttons, and reader shortcuts.
+The Controls menu lets you customize the X4 Pro's side buttons, power button, and reader shortcuts.
 
 ## Settings Menu Layout
 
@@ -14,17 +14,6 @@ The Controls menu lets you customize front buttons, side buttons, and reader sho
 - Short-press action
 - Long-press action
 - Power + Up action
-
-### Front Buttons
-
-- Remap front buttons
-- Remap front buttons while reading
-- Orientation aware
-- Long-press behavior (in-reader only)
-- Long-press back action (in-reader only)
-- Long-press menu action (in-reader only)
-
-Note: Even though some actions assigned to the front buttons could be used globally, they are restricted to apply within the reader only due to the dynamic nature of the front buttons (they can mean different things based on the screen you're on).
 
 ### Side Buttons
 
@@ -133,14 +122,14 @@ When set to `Orientation Change`, hold a side button for about 2 seconds:
 - Up cycles through the orientations in the following order: `Landscape CCW` -> `Inverted` -> `Landscape CW` -> `Portrait`
 - Down cycles through the orientations in the following order: `Landscape CW` -> `Inverted` -> `Landscape CCW` -> `Portrait`
 
-## Power, Back, and Menu Button Actions
+## Power And Home Button Actions
 
 Defaults:
 
 - Short-press Power Button Action: Ignore
 - Long-press Power Button Action: Sleep
-- Long-press Back Button Action: Browse Files
-- Long Press Menu Button Action: Ignore
+
+The capacitive Home key returns Home on a short press and opens the reader menu on a long press.
 
 Available actions include:
 
@@ -161,7 +150,6 @@ Available actions include:
 - Calibre Wireless
 - Join a Network
 - Create Hotspot
-- Tilt Page Turn (X3 only)
 - Footnotes
 - Dark Mode
 - Browse Files
@@ -210,6 +198,6 @@ pause while Quick Lock is active.
 
 ## Footnote Shortcut
 
-When a shortcut is mapped to Footnotes, the shortcut opens the footnotes submenu while reading. If the current page has only one footnote, CrossInk opens that referenced page directly.
+When a shortcut is mapped to Footnotes, the shortcut opens the footnotes submenu while reading. If the current page has only one footnote, CrossDiTo opens that referenced page directly.
 
 The **Quick-return from Footnotes** setting controls whether the Power button acts like Back after opening a footnote page, making it faster to return to the original reading position.

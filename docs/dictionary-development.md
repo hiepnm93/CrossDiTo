@@ -11,7 +11,7 @@ This guide describes the dictionary implementation currently shipped on this bra
 | `.ifo` | Recommended | Metadata and `sametypesequence` used to interpret definition fields |
 | `.syn` | Optional | Alternate forms mapped to `.idx` ordinals |
 | `.idx.oft` / `.syn.oft` | Optional | Coarse page offsets used to narrow a scan |
-| `.idx.oft.cspt` / `.syn.oft.cspt` | Optional | CrossInk prefix indexes used as the fastest lookup path |
+| `.idx.oft.cspt` / `.syn.oft.cspt` | Optional | CrossDiTo prefix indexes used as the fastest lookup path |
 | `.qidx` | Generated | Disposable sampled index built by the device when `.idx` has no prepared accelerator |
 
 The device requires an uncompressed `.dict`; it does not read `.dict.dz` or `.syn.dz` directly. Use `scripts/dictionary_tools.py prep` on a computer when decompression is needed or to generate the fastest `.oft`/`.cspt` accelerators. For an uncompressed dictionary without those accelerators, the device automatically generates `.qidx` on first lookup.
@@ -37,7 +37,7 @@ StarDict files with `idxoffsetbits=64` are parsed, but entries whose definition 
 
 `DictionaryDefinitionActivity` resolves the selected `.dict` byte range and renders one page at a time. `DictHtmlRenderer` streams HTML input, while `DictLayout::Wrapper` wraps styled spans into page lines. Keeping only the current page bounds peak RAM and avoids materializing a large definition as one in-memory document. Definition body text uses the active reader font; headers and controls keep built-in UI fonts. SD-font text is passed through unchanged. Built-in coverage uses the audited, fixed Lexend Deca/Bitter glyph set (including the renderer's `Γ`, `ε`, and `ω` fallbacks), while unsupported IPA, Greek, combining-mark, and punctuation codepoints use the existing approximations.
 
-Paging re-parses the definition from its start. This trades extra sequential reads for predictable memory usage on the ESP32-C3.
+Paging re-parses the definition from its start. This trades extra sequential reads for predictable internal-RAM use on the X4 Pro.
 
 Chained lookups use `LookupChain`, which stores compact history positions and page numbers instead of owned copies of every headword. The chain is bounded by `LookupHistory::MAX_VISIBLE_ENTRIES` (currently 50).
 
@@ -76,7 +76,7 @@ and size catalog in `lib/EpdFont/scripts/sd-fonts.yaml`, then adds the broad
 IPA, combining-mark, and reader ranges needed by dictionary definitions before
 delegating to `build-sd-fonts.py`. It packages each generated family as a ZIP.
 
-Install the font-builder dependencies and run it from the CrossInk repository
+Install the font-builder dependencies and run it from the CrossDiTo repository
 root:
 
 ```bash
@@ -118,7 +118,7 @@ The wrapper does not change `sd-fonts.yaml`; it creates a temporary transformed
 catalog for the shared builder. If a family is changed or removed, use
 `--clean` so stale files cannot be mistaken for current output.
 
-## CrossInk Prefix Index (`.cspt`)
+## CrossDiTo Prefix Index (`.cspt`)
 
 Both `.idx.oft.cspt` and `.syn.oft.cspt` use the same format:
 
@@ -140,7 +140,7 @@ The header's stride field is currently informational. Producers must continue to
 There is no dictionary-specific host fixture suite in this branch. For changes:
 
 1. Run `python3 scripts/dictionary_tools.py prep` and `lookup` against a representative StarDict dictionary.
-2. Build the simulator with `pio run -e simulator` for reader/UI integration.
+2. Build the simulator with `pio run -e x4-pro-simulator` for reader/UI integration.
 3. On hardware, test dictionaries with and without `.oft`/`.cspt`, a `.syn` dictionary, HTML definitions, long definitions, lookup history, chained lookup, and per-book overrides.
 
 Multi-word selection is limited to the currently rendered page. Reducing the reader or definition font size can fit more of a phrase on one page.

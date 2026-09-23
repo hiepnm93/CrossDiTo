@@ -6,6 +6,11 @@
 #include <Logging.h>
 #include <Wire.h>
 #include <freertos/semphr.h>
+#include <sdkconfig.h>
+
+#ifdef CONFIG_PM_ENABLE
+#include <esp_pm.h>
+#endif
 
 #include <cassert>
 
@@ -32,6 +37,17 @@ class HalPowerManager {
   enum LockMode { None, NormalSpeed };
   LockMode currentLockMode = None;
   SemaphoreHandle_t modeMutex = nullptr;  // Protect access to currentLockMode
+  uint8_t displayBusyDepth = 0;
+  bool displayBusyLoweredClock = false;
+#ifdef CONFIG_PM_ENABLE
+  // ESP-IDF owns the small lock objects; they are allocated once at startup
+  // because its public API has no caller-provided/static-storage variant.
+  esp_pm_lock_handle_t cpuMaxLock = nullptr;
+  esp_pm_lock_handle_t noLightSleepLock = nullptr;
+  bool automaticPmEnabled = false;
+  bool cpuMaxLockHeld = false;
+  bool setCpuMaxLockLocked(bool held);
+#endif
 
  public:
 #if defined(BOARD_HAS_PSRAM)
@@ -39,13 +55,19 @@ class HalPowerManager {
 #else
   static constexpr int LOW_POWER_FREQ = 10;  // MHz
 #endif
-  static constexpr unsigned long IDLE_POWER_SAVING_MS = 3000;  // ms
-  static constexpr unsigned long BATTERY_POLL_MS = 1500;       // ms
+  static constexpr unsigned long IDLE_POWER_SAVING_MS = 300;  // ms
+  static constexpr unsigned long BATTERY_POLL_MS = 1500;      // ms
 
-  void begin();
+  bool begin();
 
   // Control CPU frequency for power saving
   void setPowerSaving(bool enabled);
+
+  // A panel refresh spends most of its time waiting on the BUSY pin. These
+  // paired hooks lower CPU frequency during that wait even while a render lock
+  // is active, then restore normal speed before display I/O resumes.
+  void beginDisplayBusyWait();
+  void endDisplayBusyWait();
 
   // Setup wake up GPIO and enter deep sleep
   // Should be called inside main loop() to handle the currentLockMode
@@ -80,6 +102,9 @@ class HalPowerManager {
   class Lock {
     friend class HalPowerManager;
     bool valid = false;
+#ifdef CONFIG_PM_ENABLE
+    bool noLightSleepHeld = false;
+#endif
 
    public:
     explicit Lock();

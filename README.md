@@ -1,12 +1,12 @@
-> **This is a personal fork of [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader)** with a focus on improved fonts and minimal reading stats.
+# CrossDiTo
 
-### Supported Devices
+> **A focused Xteink X4 Pro firmware fork of [CrossInk 1.5](https://github.com/uxjulia/CrossInk), itself based on [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader).** CrossDiTo prioritizes reliable reading, responsive navigation, restrained power use, and clear typography.
 
-- Xteink X3
-- Xteink X4
+### Supported Device
+
 - Xteink X4 Pro
-- Xteink X4 Classic
-- Seeed Studio Sticky
+
+The current hardware-verified release is [CrossDiTo 1.5.1](./docs/releases/v1.5.1.md), based on CrossInk 1.5.0. The complete project history is in [CHANGELOG.md](./CHANGELOG.md).
 
 ## What's different in this fork
 
@@ -47,20 +47,20 @@ My goal with this fork was to maintain the core Crosspoint firmware while integr
 - Added ability to move finished books to "Read" folder.
 - In-book menu to quickly adjust reader options without having to exit the book.
 - Reading stats: total books read, total reading time, number of sessions, pages turned, average session time, pages turned per minute. You can also set your reading stats as your sleep screen.
-- All-time reading stats [syncing](./docs/reading-stats-sync.md) between two CrossInk devices.
-- Reading [progress sync](./docs/nearby-position-sync.md) between two CrossInk devices.
+- All-time reading stats [syncing](./docs/reading-stats-sync.md) between two CrossDiTo devices.
+- Reading [progress sync](./docs/nearby-position-sync.md) between two CrossDiTo devices.
 - Added customizable Auto Page Turn Interval (anything between 5-120 seconds).
 - Added ability to view Recent Books as a 3x3 grid view.
-- To view a more detailed list for each version, visit the [releases](https://github.com/uxjulia/CrossInk/releases) page to read release notes.
+- To view release notes and download firmware, visit the [CrossDiTo releases](https://github.com/dito94/CrossDiTo/releases) page.
 
 ---
 
 ### Reader Fonts
 
-The default fonts have been replaced with Lexend Deca and Bitter. These fonts have been chosen specifically to improve reading fluency and e-ink performance. These 'sturdier' typefaces feature uniform stroke weights and open geometries, allowing the X4/X3 to render crisp, high-contrast text with font-aliasing on while significantly reducing ghosting and artifacts.
+The default fonts have been replaced with Lexend Deca and Bitter. These fonts have been chosen specifically to improve reading fluency and e-ink performance. These 'sturdier' typefaces feature uniform stroke weights and open geometries, allowing the X4 Pro to render crisp, high-contrast text with font-aliasing on while significantly reducing ghosting and artifacts.
 
 - [Lexend Deca](https://fonts.google.com/specimen/Lexend+Deca) - A research-backed sans-serif typeface designed to improve reading fluency. Lexend was engineered based on the theory that reading issues are often a design problem (visual crowding) rather than a cognitive one.
-- [Bitter](https://fonts.google.com/specimen/Bitter) - A "contemporary" slab serif typeface for text, it is specially designed for comfortably reading on digital screens. The consistent stroke weight of Bitter helps it render particularly well on e-ink devices. The medium weight has been chosen specifically for improved rendering on the X4/X3.
+- [Bitter](https://fonts.google.com/specimen/Bitter) - A "contemporary" slab serif typeface for text, it is specially designed for comfortably reading on digital screens. The consistent stroke weight of Bitter helps it render particularly well on e-ink devices. The medium weight has been chosen specifically for improved rendering on the X4 Pro.
 
 The UI now uses [Inter](https://fonts.google.com/specimen/Inter) as the display font which has improved readability at smaller sizes.
 
@@ -72,7 +72,7 @@ The UI now uses [Inter](https://fonts.google.com/specimen/Inter) as the display 
 
 ### Font Sizes
 
-CrossInk includes 10 pt, 12 pt, 14 pt, and 16 pt built-in reader font sizes.
+CrossDiTo includes 10 pt, 12 pt, 14 pt, and 16 pt built-in reader font sizes.
 
 See [SD Card Fonts](./docs/sd-card-fonts.md) for installing additional font families and size ranges.
 
@@ -84,7 +84,7 @@ Reader Options, Focus Reading, Guide Dots, Force Paragraph Indents, reading stat
 
 ### Custom button actions
 
-CrossInk adds configurable button shortcuts.
+CrossDiTo adds configurable button shortcuts.
 
 See [Controls](./docs/controls.md) for the full action list and defaults.
 
@@ -92,7 +92,7 @@ See [Controls](./docs/controls.md) for the full action list and defaults.
 
 ## Tips for the best reading experience
 
-CrossInk runs on an ESP32-C3 with limited RAM, so very large folders or complex EPUBs can be slower than they would be on a phone, tablet, or desktop app.
+CrossDiTo uses the X4 Pro's ESP32-S3 and PSRAM, but internal RAM and e-ink bandwidth are still constrained compared with a phone, tablet, or desktop app.
 
 - Keep folders under about 200 files. For the smoothest browsing, aim for 50-100 files per folder.
 - Having 1000+ books on the SD card is fine if they are split into smaller folders, such as by author, series, genre, or read/unread status.
@@ -100,15 +100,13 @@ CrossInk runs on an ESP32-C3 with limited RAM, so very large folders or complex 
 - Text-first EPUBs are the best fit. Large image-heavy EPUBs, scanned books, comics, and omnibus files with thousands of sections may load slowly or fail under memory pressure.
 - As a rough target, EPUBs under 20 MB tend to work the best. Files over 50 MB may still work, but they are more likely to be slow or memory-sensitive, especially if they contain many large images.
 - If an EPUB is unusually slow, try [optimizing](./docs/webserver.md#epub-optimization) it with the built-in web optimizer (via File Transfer) before copying it to the SD card: remove unused high-resolution images, split very large omnibus files, and avoid embedding multiple full font families when possible.
-- Use a reliable SD card and leave some free space. CrossInk stores settings, reading progress, cache files, stats, and generated book data on the card.
+- Use a reliable SD card and leave some free space. CrossDiTo stores settings, reading progress, cache files, stats, and generated book data on the card.
 
 ---
 
 ## Installation
 
-The fastest way to install Crossink is by using Inky, Crossink's web companion app: https://inky.crossink.dev/#flash-tools
-
-Download a `firmware-*.bin` from the [releases page](https://github.com/uxjulia/CrossInk/releases), then flash it with the web installer or command line.
+Download `CrossDiTo-x4-pro-v1.5.1.bin` from the [CrossDiTo 1.5.1 release](https://github.com/dito94/CrossDiTo/releases/tag/v1.5.1). For an existing CrossDiTo installation, copy the file to the SD card and select **Settings > System > SD Card Firmware Update**. USB command-line flashing is also documented.
 
 See [Installation](./docs/installation.md) for step-by-step flashing and revert instructions.
 
@@ -122,7 +120,9 @@ Visit [https://www.crossink.dev](https://www.crossink.dev) for more user guides 
 
 ## Development quick start
 
-CrossInk uses PlatformIO for building and flashing firmware. See [Getting Started](./docs/development/getting-started.md) for prerequisites, clone setup, and validation commands.
+CrossDiTo uses PlatformIO for building and flashing firmware.
+
+See [Getting Started](./docs/development/getting-started.md) for prerequisites, clone setup, and validation commands.
 
 ### Nix/NixOS
 
@@ -134,7 +134,7 @@ nix develop -f nix
 nix-shell nix
 ```
 
-To flash a connected ESP32-C3 device, enable PlatformIO's udev rules in your NixOS configuration:
+To flash the X4 Pro's ESP32-S3, enable PlatformIO's udev rules in your NixOS configuration:
 
 ```nix
 services.udev.packages = with pkgs; [ platformio-core.udev ];
@@ -144,30 +144,41 @@ After rebuilding the system configuration, reconnect the device or reload udev r
 
 ### Build / flash / monitor
 
-Connect your device to your computer via a USB cable. Before the first build, initialize the repository's submodules (including `freeink-sdk`):
+Connect the X4 Pro via USB-C:
 
 ```sh
-git submodule update --init --recursive
+# Xteink X4 Pro
+pio run -e x4-pro --target upload
 ```
 
-Then flash the firmware using the correct environment for the device. The `default` environment is for the X3/X4 devices. ESP32-S3 devices have their own named environments.
-
-```sh
-pio run -e default --target upload
-```
-
-If PlatformIO reports `PackageException: Can not create a symbolic link for freeink-sdk/libs/hardware/BatteryMonitor, not a directory`, the `freeink-sdk` submodule is not initialized. Run the submodule command above and retry.
+`x4-pro` is the only production firmware environment. Running `pio run` without `-e` builds the same target.
 
 See [Testing and Debugging](./docs/development/testing-debugging.md) for serial logging, simulator checks, static analysis, and bug-report guidance.
 
 ---
 
-## Notice on Contributions
+## Repository layout
 
-This repository does not accept pull requests. Feature requests may be opened in [discussions](https://github.com/uxjulia/CrossInk/discussions), but major features requiring ongoing support should be directed upstream to [CrossPoint](https://github.com/crosspoint-reader/crosspoint-reader).
+- `src/` - app orchestration, settings/state, and activity implementations (home, reader, settings, network, boot/sleep)
+- `lib/` - supporting libraries: EPUB parsing/layout, fonts, i18n, filesystem helpers, HAL wrappers, and more
+- `freeink-sdk/` - the exact vendored hardware SDK snapshot used by the verified X4 Pro release; it contains display, input, storage, frontlight, and battery support
+- `web/` - web portal sources (`templates/`, `pages/`, `assets/`); compiled by `scripts/build_web.py` into `src/network/html/*.generated.h`
+- `docs/` - user and developer documentation, published via the `site/` Astro site
+- `site/` - Astro project that builds `docs/` into the CrossDiTo documentation website
+- `test/` - unit tests and EPUB test fixtures
+- `scripts/` - build, codegen, and release tooling (i18n generation, web asset building, hyphenation tries, release packaging, etc.)
+- `bin/` - helper scripts for formatting (`clang-format-fix`) and CI checks
+- `fs_/` - sample SD card contents (books, sleep images, themes) used by the simulator
+- `nix/` - Nix/NixOS development shell definitions
+- `managed_components/` - ESP-IDF managed component dependencies, fetched automatically during build
+- [`SCOPE.md`](./SCOPE.md) and [`CHANGELOG.md`](./CHANGELOG.md) - project scope and complete release history
+
+## Internals
+
+CrossDiTo keeps its 48 KB display framebuffer in PSRAM and stores reusable book data on the SD card, preserving faster internal RAM for tasks, drivers, and latency-sensitive work.
 
 ---
 
 If you'd like to show some love and support ongoing development, please consider supporting me on Ko-fi.
 
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/Q5Q01M6S7)
+CrossDiTo intentionally stays narrow and X4 Pro-only. Bug reports may be opened in [CrossDiTo issues](https://github.com/dito94/CrossDiTo/issues). Major features requiring broad device support or ongoing upstream maintenance should be proposed to [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader).

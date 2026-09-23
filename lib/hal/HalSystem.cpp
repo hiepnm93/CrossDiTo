@@ -6,10 +6,7 @@
 #include "Arduino.h"
 #include "HalStorage.h"
 #include "Logging.h"
-#include "esp_debug_helpers.h"
-#include "esp_private/esp_cpu_internal.h"
-#include "esp_private/esp_system_attr.h"
-#include "esp_private/panic_internal.h"
+#include "esp32-hal.h"
 
 #if CONFIG_IDF_TARGET_ARCH_XTENSA
 #include "esp_cpu_utils.h"
@@ -61,10 +58,17 @@ RTC_NOINIT_ATTR XtensaPanicRegisters panicXtensaRegisters;
 // panic diagnostic was captured before the reset.
 RTC_NOINIT_ATTR volatile uint32_t panicCaptureMarker;
 
-extern "C" {
+struct PanicCapture {
+  uint32_t magic;
+  uint32_t pc;
+  uint32_t backtrace[MAX_PANIC_BACKTRACE_DEPTH];
+  uint8_t backtraceLength;
+  int8_t core;
+  uint8_t flags;
+};
 
-void __real_panic_abort(const char* message);
-void __real_panic_print_backtrace(const void* frame, int core);
+RTC_NOINIT_ATTR char panicMessage[256];
+RTC_NOINIT_ATTR PanicCapture panicCapture;
 
 static DRAM_ATTR const char PANIC_REASON_UNKNOWN[] = "(unknown panic reason)";
 
@@ -125,20 +129,39 @@ void IRAM_ATTR captureRiscvPanicRegisters(const void* frame) {
 
 void IRAM_ATTR __wrap_panic_abort(const char* message) {
   if (!message) message = PANIC_REASON_UNKNOWN;
-  // IRAM-safe bounded copy (strncpy is not IRAM-safe in panic context)
-  int i = 0;
-  for (; i < (int)sizeof(panicMessage) - 1 && message[i]; i++) {
+  // IRAM-safe bounded copy (strncpy is not IRAM-safe in panic context).
+  size_t i = 0;
+  for (; i < sizeof(panicMessage) - 1 && message[i]; ++i) {
     panicMessage[i] = message[i];
   }
   panicMessage[i] = '\0';
   panicCaptureMarker = PANIC_CAPTURE_MAGIC;
 
-  __real_panic_abort(message);
+void IRAM_ATTR panicMemoryBarrier() {
+#if defined(__XTENSA__)
+  __asm__ __volatile__("memw" ::: "memory");
+#else
+  __asm__ __volatile__("" ::: "memory");
+#endif
 }
 
-void IRAM_ATTR __wrap_panic_print_backtrace(const void* frame, int core) {
-  if (!frame) {
-    __real_panic_print_backtrace(frame, core);
+void IRAM_ATTR commitPanicCapture() {
+  // Keep the validity marker strictly after the RTC payload, including across
+  // the Xtensa write buffer, so a reboot never accepts a partial backtrace.
+  panicMemoryBarrier();
+  panicCapture.magic = PANIC_CAPTURE_MAGIC;
+  panicMemoryBarrier();
+}
+
+void IRAM_ATTR captureArduinoPanic(arduino_panic_info_t* info, void*) {
+  // Invalidate first so a reset during capture cannot expose partial RTC data.
+  panicCapture.magic = 0;
+  panicMemoryBarrier();
+  clearPanicTrace();
+
+  if (!info) {
+    copyPanicReason(nullptr);
+    commitPanicCapture();
     return;
   }
 
@@ -157,31 +180,25 @@ void IRAM_ATTR __wrap_panic_print_backtrace(const void* frame, int core) {
 
   captureRiscvPanicRegisters(frame);
 
-  // Copied from components/esp_system/port/arch/riscv/panic_arch.c
-  uint32_t sp = (uint32_t)((RvExcFrame*)frame)->sp;
-  const int per_line = 8;
-  int depth = 0;
-  for (int x = 0; x < 1024; x += per_line * sizeof(uint32_t)) {
-    uint32_t* spp = (uint32_t*)(sp + x);
-    // panic_print_hex(sp + x);
-    // panic_print_str(": ");
-    panicStack[depth].sp = sp + x;
-    for (int y = 0; y < per_line; y++) {
-      // panic_print_str("0x");
-      // panic_print_hex(spp[y]);
-      // panic_print_str(y == per_line - 1 ? "\r\n" : " ");
-      panicStack[depth].spp[y] = spp[y];
-    }
+  commitPanicCapture();
+}
 
-    depth++;
-    if (depth >= MAX_PANIC_STACK_DEPTH) {
-      break;
-    }
+}  // namespace
+
+extern "C" {
+
+void __real_panic_abort(const char* message);
+
+void IRAM_ATTR __wrap_panic_abort(const char* message) {
+  // panic_abort() can run before HalSystem::begin() installs the Arduino panic
+  // callback. Preserve an existing detailed trace, otherwise initialize a
+  // reason-only capture.
+  if (panicCapture.magic != PANIC_CAPTURE_MAGIC) {
+    clearPanicTrace();
   }
   panicCaptureMarker = PANIC_CAPTURE_MAGIC;
 
-  __real_panic_print_backtrace(frame, core);
-#endif
+  __real_panic_abort(message);
 }
 }
 
@@ -193,6 +210,11 @@ void begin() {
   if (!isRebootFromPanic()) {
     clearPanic();
   } else {
+    if (panicCapture.magic != PANIC_CAPTURE_MAGIC) {
+      panicMessage[0] = '\0';
+      clearPanicTrace();
+      panicCapture.magic = PANIC_CAPTURE_MAGIC;
+    }
     // Panic reboot: preserve logs and panic info, but clamp logHead in case the
     // panic occurred before begin() ever ran (e.g. in a static constructor).
     // If logHead was out of range, logMessages is also garbage — clear it so
@@ -201,6 +223,11 @@ void begin() {
       clearLastLogs();
     }
   }
+
+  // Arduino-ESP32 3.x walks the Xtensa exception frame before invoking this
+  // callback. Copy only fixed-size data into RTC memory; never allocate or log
+  // from panic context.
+  set_arduino_panic_handler(captureArduinoPanic, nullptr);
 }
 
 void checkPanic() {
@@ -246,9 +273,15 @@ std::string getPanicInfo(bool full) {
   } else {
     std::string info;
 
-    info += "CrossInk version: " CROSSINK_VERSION;
-    info += "\nCrossInk device type: " CROSSINK_FIRMWARE_DEVICE_TYPE;
-    info += "\n\nPanic reason: " + std::string(panicMessage);
+    info += CROSSDITO_PRODUCT_NAME " version: " CROSSINK_VERSION;
+    info += "\nUpstream base: " CROSSDITO_UPSTREAM_PRODUCT_NAME " " CROSSDITO_UPSTREAM_VERSION;
+    info += "\n" CROSSDITO_PRODUCT_NAME " device type: " CROSSINK_FIRMWARE_DEVICE_TYPE;
+    info += "\n\nPanic reason: ";
+    info += panicMessage[0] ? panicMessage : "(not captured)";
+    char summary[64];
+    snprintf(summary, sizeof(summary), "\nPanic core: %d\nPanic PC: 0x%08X", static_cast<int>(panicCapture.core),
+             panicCapture.pc);
+    info += summary;
     info += "\n\nLast logs:\n" + getLastLogs();
     auto toHex = [](uint32_t value) {
       char buffer[9];
@@ -299,6 +332,9 @@ std::string getPanicInfo(bool full) {
         info += "0x" + toHex(panicBacktrace[i]) + "\n";
       }
     }
+    if (panicCapture.backtraceLength == 0 || panicCapture.backtraceLength % 8 != 0) info += "\n";
+    if ((panicCapture.flags & PANIC_FLAG_BACKTRACE_CORRUPT) != 0) info += "[backtrace corrupt]\n";
+    if ((panicCapture.flags & PANIC_FLAG_BACKTRACE_CONTINUES) != 0) info += "[backtrace truncated]\n";
 
     return info;
   }

@@ -1,6 +1,6 @@
 # Architecture Overview
 
-CrossInk is firmware for the Xteink X4 and X3, built with PlatformIO targeting the ESP32-C3 microcontroller.
+CrossDiTo is focused firmware for the Xteink X4 Pro, built around the ESP32-S3R8 with 8 MB PSRAM.
 
 At a high level, it is firmware that uses an activity-driven application architecture loop with persistent settings/state, SD-card-first caching, and a rendering pipeline optimized for e-ink constraints.
 
@@ -8,7 +8,7 @@ At a high level, it is firmware that uses an activity-driven application archite
 
 ```mermaid
 graph TD
-    A[Hardware: ESP32-C3 + SD + E-ink + Buttons] --> B[freeink-sdk]
+    A[Hardware: ESP32-S3 + PSRAM + SDMMC + E-ink + Input] --> B[freeink-sdk]
     B --> C[lib/hal wrappers]
     C --> D[src/main.cpp runtime loop]
     D --> E[Activities layer]
@@ -92,7 +92,7 @@ writes `css_rules.cache`, and the section layout step writes `sections/*.bin`.
 
 Why caching matters:
 
-- RAM is limited on ESP32-C3, so expensive parsed/layout data is persisted to SD
+- Internal RAM remains limited even with PSRAM, so expensive parsed/layout data is persisted to SD
 - repeat opens/page navigation can reuse cached data instead of full reparsing
 
 ## Reader internals call graph

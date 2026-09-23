@@ -1,12 +1,12 @@
-# Project Vision & Scope: CrossInk
+# Project Vision & Scope: CrossDiTo
 
 The goal of this CrossPoint fork is to provide useful enhancements while still adhering to the core principles of Crosspoint. If you have a major feature request, it should first be directed at the main project since this is a downstream project that consumes their updates.
 
-The content below is taken directly from Crosspoint and aligns with CrossInk's vision as well.
+The content below is taken directly from Crosspoint and aligns with CrossDiTo's vision as well.
 
 ## 1. Core Mission
 
-To provide a lightweight, high-performance firmware that maximizes the potential of the X4, prioritizing legibility and usability over "swiss-army-knife" functionality.
+To provide lightweight, high-performance firmware that maximizes the potential of the X4 Pro, prioritizing legibility and usability over "swiss-army-knife" functionality.
 
 ## 2. Scope
 
@@ -27,19 +27,18 @@ To provide a lightweight, high-performance firmware that maximizes the potential
 * **Language Support:** E.g. Support for multiple languages both in the reader and in the interfaces.
 * **Reference Tools:** E.g. Local dictionary lookup. Providing quick, offline definitions to enhance comprehension
   without breaking focus.
-* **Clock Display (device dependent):**
+* **Clock Display:**
 
 | Device | Scope |
 | -- | -- |
-| X3 | The X3 uses a dedicated DS3231 RTC, which maintains accurate time across sleep cycles and can be treated as a reliable wall clock. |
-| X4 | The X4 relies on the ESP32-C3's internal RTC, which drifts significantly during deep sleep. NTP sync could correct this, with an appropriate user experience around connecting to the internet on wake or on demand. This causes some tension with the **Active Connectivity** section below, so please open a discussion about this UX if it's a feature you would find useful. |
+| X4 Pro | The dedicated BM8563-compatible RTC maintains wall-clock time across sleep cycles. Network time correction remains an explicit, user-initiated action. |
 
 ### Out-of-Scope
 
 *These items are rejected because they compromise the device's stability or mission.*
 
 * **Interactive Apps:** No Notepads, Calculators, or Games. This is a reader, not a PDA.
-* **Active Connectivity:** No RSS readers, News aggregators, or Web browsers. Background Wi-Fi tasks drain the battery and complicate the single-core CPU's execution.
+* **Active Connectivity:** No RSS readers, News aggregators, or Web browsers. Background Wi-Fi tasks drain the battery and add failure modes unrelated to reading.
 * **Media Playback:** No Audio players or Audiobooks.
 * **Complex Annotation:** No typed out notes. These features are better suited for devices with better input capabilities and more powerful chips.
 

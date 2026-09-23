@@ -281,8 +281,8 @@ void EpubReaderClippingListActivity::showClippingActionMenu(const bool ignoreIni
   items.push_back({FileBrowserAction::Delete, StrId::STR_DELETE});
 
   startActivityForResult(
-      std::make_unique<FileBrowserActionActivity>(renderer, mappedInput, title, std::move(items),
-                                                  ignoreInitialConfirmRelease),
+      makeUniqueNoThrow<FileBrowserActionActivity>(renderer, mappedInput, title, std::move(items),
+                                                   ignoreInitialConfirmRelease),
       [this, selectedSpineIndex, selectedStartPage, selectedStartWordIndex,
        selectedTimestamp](const ActivityResult& result) {
         longPressConfirmHandled = false;

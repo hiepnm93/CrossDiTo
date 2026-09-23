@@ -448,7 +448,7 @@ void ReaderOptionsActivity::toggleCurrentSetting() {
   const auto& setting = (*currentSettings)[selectedIndex];
 
   if (setting.nameId == StrId::STR_FONT_FAMILY && setting.type == SettingType::ENUM) {
-    startActivityForResult(std::make_unique<FontSelectionActivity>(renderer, mappedInput, &sdFontSystem.registry()),
+    startActivityForResult(makeUniqueNoThrow<FontSelectionActivity>(renderer, mappedInput, &sdFontSystem.registry()),
                            [this](const ActivityResult& result) {
                              if (!result.isCancelled) {
                                persistReaderSettings();
@@ -534,7 +534,7 @@ void ReaderOptionsActivity::toggleCurrentSetting() {
       }
       beginGlobalSettingsEdit();
       startActivityForResult(
-          std::make_unique<StatusBarSettingsActivity>(renderer, mappedInput, true, stablePageNumbersAvailable),
+          makeUniqueNoThrow<StatusBarSettingsActivity>(renderer, mappedInput, true, stablePageNumbersAvailable),
           [this](const ActivityResult&) {
             persistGlobalSettings();
             endGlobalSettingsEdit();
@@ -549,7 +549,7 @@ void ReaderOptionsActivity::toggleCurrentSetting() {
 
 void ReaderOptionsActivity::openLineHeightPicker() {
   startActivityForResult(
-      std::make_unique<IntervalSelectionActivity>(
+      makeUniqueNoThrow<IntervalSelectionActivity>(
           renderer, mappedInput, "ReaderOptionsLineHeightInterval", StrId::STR_LINE_SPACING, SETTINGS.lineHeightPercent,
           CrossPointSettings::MIN_LINE_HEIGHT_PERCENT, CrossPointSettings::MAX_LINE_HEIGHT_PERCENT, 1, 5,
           StrId::STR_NONE_OPT, /*readerActivity=*/true,

@@ -170,7 +170,7 @@ void OpdsServerListActivity::handleSelection() {
       }
       requestUpdate();
     };
-    startActivityForResult(std::make_unique<KeyboardEntryActivity>(
+    startActivityForResult(makeUniqueNoThrow<KeyboardEntryActivity>(
                                renderer, mappedInput, tr(STR_OPDS_DOWNLOAD_FOLDER), SETTINGS.opdsDownloadFolder,
                                sizeof(SETTINGS.opdsDownloadFolder) - 1, InputType::Text),
                            resultHandler);
@@ -185,9 +185,10 @@ void OpdsServerListActivity::handleSelection() {
   };
 
   if (selectedIndex < serverCount) {
-    startActivityForResult(std::make_unique<OpdsSettingsActivity>(renderer, mappedInput, selectedIndex), resultHandler);
+    startActivityForResult(makeUniqueNoThrow<OpdsSettingsActivity>(renderer, mappedInput, selectedIndex),
+                           resultHandler);
   } else {
-    startActivityForResult(std::make_unique<OpdsSettingsActivity>(renderer, mappedInput, -1), resultHandler);
+    startActivityForResult(makeUniqueNoThrow<OpdsSettingsActivity>(renderer, mappedInput, -1), resultHandler);
   }
 }
 

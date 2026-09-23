@@ -262,12 +262,12 @@ void ControlsOptionsActivity::toggleCurrentSetting() {
       return;
     }
     if (setting.action == SettingAction::RemapFrontButtons) {
-      startActivityForResult(std::make_unique<ButtonRemapActivity>(renderer, mappedInput, false, true),
+      startActivityForResult(makeUniqueNoThrow<ButtonRemapActivity>(renderer, mappedInput, false, true),
                              [](const ActivityResult&) { SETTINGS.saveToFile(); });
       return;
     }
     if (setting.action == SettingAction::RemapFrontButtonsReader) {
-      startActivityForResult(std::make_unique<ButtonRemapActivity>(renderer, mappedInput, true, true),
+      startActivityForResult(makeUniqueNoThrow<ButtonRemapActivity>(renderer, mappedInput, true, true),
                              [](const ActivityResult&) { SETTINGS.saveToFile(); });
       return;
     }

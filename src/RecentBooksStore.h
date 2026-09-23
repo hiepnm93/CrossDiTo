@@ -2,6 +2,7 @@
 #include <ArduinoJson.h>
 #include <PersistableStore.h>
 
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -21,12 +22,16 @@ struct RecentBook {
 class RecentBooksStore : public PersistableStore<RecentBooksStore> {
  private:
   std::vector<RecentBook> recentBooks;
+  mutable std::atomic<uint8_t> loadState{0};  // 0=not loaded, 1=loading, 2=ready
+  bool loadSucceeded = false;
 
   static constexpr int MAX_RECENT_BOOKS = 18;
 
   RecentBooksStore() = default;
   ~RecentBooksStore() = default;
   bool loadFromBinaryFile();
+  bool loadFromFileImpl();
+  void ensureLoaded() const;
 
   friend class PersistableStore<RecentBooksStore>;
 
@@ -36,6 +41,7 @@ class RecentBooksStore : public PersistableStore<RecentBooksStore> {
   bool fromJson(JsonVariantConst doc);
   bool saveToFile() const;
   bool loadFromFile();
+  bool saveToFile() const;
 
   // Add a new book to the front, or refresh an existing entry and promote it
   // to the front.

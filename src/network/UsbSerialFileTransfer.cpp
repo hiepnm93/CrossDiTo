@@ -749,7 +749,8 @@ void registerUsbCdcOverflowHandler() {
 }
 
 ProcessResult process(bool allowed) {
-  if (!logSerial) return ProcessResult::None;
+  serviceLogSerialTransport();
+  if (!isLogSerialTransportStarted() || !logSerial) return ProcessResult::None;
   fileTransferAllowed = allowed;
 
   while (logSerial.available() > 0) {

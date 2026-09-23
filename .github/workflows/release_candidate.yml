@@ -1,4 +1,4 @@
-name: Compile Release Candidate
+name: Compile CrossDiTo Release Candidate
 
 on:
   workflow_dispatch:
@@ -27,8 +27,6 @@ jobs:
       RC_HASH: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v6
-        with:
-          submodules: recursive
 
       - uses: actions/setup-python@v6
         with:
@@ -66,68 +64,29 @@ jobs:
           echo "RC_TAG=$rc_tag" >> "$GITHUB_ENV"
           echo "VERSION=${branch_safe}-RC" >> "$GITHUB_ENV"
 
-      - name: Set version from branch
+      - name: Set base version from branch
         shell: bash
         run: |
-          VERSION="${RC_BRANCH_RAW}-RC"
-          escaped_version=$(printf '%s\n' "$VERSION" | sed 's/[&|]/\\&/g')
-          sed -i "/^\[crossink\]$/,/^\[/s|^version = .*|version = ${escaped_version}|" platformio.ini
+          escaped_version=$(printf '%s\n' "$RC_BRANCH_SAFE" | sed 's/[&|]/\\&/g')
+          sed -i "/^\[crossdito\]$/,/^\[/s|^version = .*|version = ${escaped_version}|" platformio.ini
 
-      - name: Build CrossInk
+      - name: Build CrossDiTo for X4 Pro
         shell: bash
         env:
-          CROSSINK_RELEASE_VERSION: "1"
+          CROSSINK_RC_ARTIFACTS: "1"
           CROSSINK_RC_BRANCH: ${{ env.RC_BRANCH_RAW }}
           CROSSINK_RC_HASH: ${{ env.RC_HASH_SHORT }}
-        run: pio run -j1 -e ${{ matrix.environment }}
-
-      - name: Upload firmware artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-candidate-firmware-${{ matrix.environment }}
-          path: .pio/build/${{ matrix.environment }}/${{ matrix.firmware }}-${{ env.RC_BRANCH_SAFE }}-${{ env.RC_HASH_SHORT }}-RC.bin
-          if-no-files-found: error
-
-  publish-release-candidate:
-    if: startsWith(github.ref_name, 'release/')
-    needs: build-release-candidate
-    runs-on: ubuntu-latest
-    env:
-      RC_BRANCH: ${{ github.ref_name }}
-      RC_HASH: ${{ github.sha }}
-    steps:
-      - name: Resolve release-candidate metadata
-        shell: bash
-        run: |
-          branch_without_prefix="${RC_BRANCH#release/}"
-          branch_safe=$(printf '%s\n' "$branch_without_prefix" | sed -E 's/[^A-Za-z0-9._-]+/-/g; s/^-+//; s/-+$//')
-          hash_short="${RC_HASH::7}"
-          rc_tag="rc-${branch_safe}-${hash_short}"
-          echo "RC_BRANCH_RAW=$branch_without_prefix" >> "$GITHUB_ENV"
-          echo "RC_BRANCH_SAFE=$branch_safe" >> "$GITHUB_ENV"
-          echo "RC_HASH_SHORT=$hash_short" >> "$GITHUB_ENV"
-          echo "RC_TAG=$rc_tag" >> "$GITHUB_ENV"
-
-      - name: Download firmware artifacts
-        uses: actions/download-artifact@v7
-        with:
-          pattern: release-candidate-firmware-*
-          merge-multiple: true
-          path: release-candidate-firmware
+        run: pio run -e x4-pro
 
       - name: Create GitHub RC Prerelease
         uses: softprops/action-gh-release@v3
         with:
-          token: ${{ secrets.RELEASE_PAT }}
           tag_name: ${{ env.RC_TAG }}
           target_commitish: ${{ github.sha }}
-          name: RC ${{ env.RC_BRANCH_SAFE }} ${{ env.RC_HASH_SHORT }}
+          name: CrossDiTo RC ${{ env.RC_BRANCH_SAFE }} ${{ env.RC_HASH_SHORT }}
           body: |
             Draft release candidate build from `release/${{ env.RC_BRANCH_RAW }}` at `${{ env.RC_HASH_SHORT }}`.
           draft: true
           prerelease: true
           files: |
-            release-candidate-firmware/firmware-x3-x4-${{ env.RC_BRANCH_SAFE }}-${{ env.RC_HASH_SHORT }}-RC.bin
-            release-candidate-firmware/firmware-sticky-${{ env.RC_BRANCH_SAFE }}-${{ env.RC_HASH_SHORT }}-RC.bin
-            release-candidate-firmware/firmware-x4-pro-${{ env.RC_BRANCH_SAFE }}-${{ env.RC_HASH_SHORT }}-RC.bin
-            release-candidate-firmware/firmware-x4-classic-${{ env.RC_BRANCH_SAFE }}-${{ env.RC_HASH_SHORT }}-RC.bin
+            .pio/build/x4-pro/CrossDiTo-x4-pro-${{ env.RC_BRANCH_SAFE }}-${{ env.RC_HASH_SHORT }}-RC.bin

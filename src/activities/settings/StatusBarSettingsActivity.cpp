@@ -20,7 +20,7 @@ namespace fui = freeink::ui;
 
 namespace {
 enum MenuItem {
-  ITEM_CHAPTER_PAGE_COUNT = 0,
+  ITEM_PAGE_COUNT = 0,
   ITEM_STABLE_PAGE_NUMBERS,
   ITEM_BOOK_PROGRESS_PERCENTAGE,
   ITEM_BOOK_PERCENTAGE_FORMAT,
@@ -34,7 +34,7 @@ enum MenuItem {
 };
 
 const StrId menuNames[ITEM_COUNT] = {
-    StrId::STR_CHAPTER_PAGE_COUNT,
+    StrId::STR_PAGE_COUNT,
     StrId::STR_STABLE_PAGE_NUMBERS,
     StrId::STR_BOOK_PROGRESS_PERCENTAGE,
     StrId::STR_PERCENTAGE_FORMAT,
@@ -118,6 +118,8 @@ const char* optionNameForItem(const int item, const int optionIndex) {
 
 uint8_t optionRawValueForItem(const int item, const int optionIndex) {
   switch (item) {
+    case ITEM_PAGE_COUNT:
+      return pageCountRawValues[optionIndex];
     case ITEM_PROGRESS_BAR:
       return progressBarRawValues[optionIndex];
     case ITEM_TITLE:
@@ -187,8 +189,6 @@ void setOptionIndexForItem(const int item, const uint8_t optionIndex) {
 
 std::string valueTextForItem(const int item) {
   switch (item) {
-    case ITEM_CHAPTER_PAGE_COUNT:
-      return SETTINGS.statusBarChapterPageCount ? tr(STR_SHOW) : tr(STR_HIDE);
     case ITEM_STABLE_PAGE_NUMBERS:
       return SETTINGS.stablePageNumbers ? tr(STR_SHOW) : tr(STR_HIDE);
     case ITEM_BOOK_PROGRESS_PERCENTAGE:
@@ -223,6 +223,10 @@ void StatusBarSettingsActivity::onEnter() {
   }
 
   // Clamp statusBarProgressBar and statusBarTitle in case of corrupt/migrated data
+  if (SETTINGS.statusBarChapterPageCount >= CrossPointSettings::STATUS_BAR_PAGE_COUNT_COUNT) {
+    SETTINGS.statusBarChapterPageCount = CrossPointSettings::STATUS_BAR_PAGE_COUNT::PAGE_COUNT_CHAPTER;
+  }
+
   if (SETTINGS.statusBarProgressBar >= PROGRESS_BAR_ITEMS) {
     SETTINGS.statusBarProgressBar = CrossPointSettings::STATUS_BAR_PROGRESS_BAR::HIDE_PROGRESS;
   }
@@ -336,9 +340,6 @@ void StatusBarSettingsActivity::handleSelection() {
   }
 
   switch (item) {
-    case ITEM_CHAPTER_PAGE_COUNT:
-      SETTINGS.statusBarChapterPageCount = (SETTINGS.statusBarChapterPageCount + 1) % 2;
-      break;
     case ITEM_STABLE_PAGE_NUMBERS:
       SETTINGS.stablePageNumbers = (SETTINGS.stablePageNumbers + 1) % 2;
       break;

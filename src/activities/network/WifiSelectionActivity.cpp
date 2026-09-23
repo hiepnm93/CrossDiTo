@@ -392,53 +392,64 @@ void WifiSelectionActivity::processWifiScanResults() {
   networks.reserve(scanResult);
   int hiddenNetworks = 0;
   int duplicateNetworks = 0;
+  bool shouldTrySavedNetwork = false;
 
-  for (int i = 0; i < scanResult; i++) {
-    char ssid[33];
-    strlcpy(ssid, WiFi.SSID(i).c_str(), sizeof(ssid));
-    const int32_t rssi = WiFi.RSSI(i);
-    const int authMode = WiFi.encryptionType(i);
+  {
+    // Reuse the activity-owned vector rather than allocating a second result
+    // list. The lock prevents the render task from reading strings while the
+    // vector is cleared, grown, sorted, and published.
+    RenderLock lock(*this);
+    networks.clear();
+    networks.reserve(scanResult);
 
-    // Skip hidden networks (empty SSID)
-    if (ssid[0] == '\0') {
-      hiddenNetworks++;
-      continue;
+    for (int i = 0; i < scanResult; i++) {
+      char ssid[33];
+      strlcpy(ssid, WiFi.SSID(i).c_str(), sizeof(ssid));
+      const int32_t rssi = WiFi.RSSI(i);
+      const int authMode = WiFi.encryptionType(i);
+
+      // Skip hidden networks (empty SSID)
+      if (ssid[0] == '\0') {
+        hiddenNetworks++;
+        continue;
+      }
+
+      auto it =
+          std::find_if(networks.begin(), networks.end(), [&ssid](const WifiNetworkInfo& n) { return n.ssid == ssid; });
+      if (it != networks.end()) {
+        duplicateNetworks++;
+      }
+      if (it == networks.end()) {
+        WifiNetworkInfo network;
+        network.ssid = ssid;
+        network.rssi = rssi;
+        network.isEncrypted = (authMode != WIFI_AUTH_OPEN);
+        network.hasSavedPassword = WIFI_STORE.hasSavedCredential(network.ssid);
+        networks.push_back(std::move(network));
+      } else if (rssi > it->rssi) {
+        it->rssi = rssi;
+        it->isEncrypted = (authMode != WIFI_AUTH_OPEN);
+      }
     }
 
-    auto it =
-        std::find_if(networks.begin(), networks.end(), [&ssid](const WifiNetworkInfo& n) { return n.ssid == ssid; });
-    if (it != networks.end()) {
-      duplicateNetworks++;
-    }
-    if (it == networks.end()) {
-      WifiNetworkInfo network;
-      network.ssid = ssid;
-      network.rssi = rssi;
-      network.isEncrypted = (authMode != WIFI_AUTH_OPEN);
-      network.hasSavedPassword = WIFI_STORE.hasSavedCredential(network.ssid);
-      networks.push_back(std::move(network));
-    } else if (rssi > it->rssi) {
-      it->rssi = rssi;
-      it->isEncrypted = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
-    }
+    // Sort: saved-password networks first, then by signal strength (strongest first)
+    std::sort(networks.begin(), networks.end(), [](const WifiNetworkInfo& a, const WifiNetworkInfo& b) {
+      if (a.hasSavedPassword != b.hasSavedPassword) {
+        return a.hasSavedPassword;
+      }
+      return a.rssi > b.rssi;
+    });
+
+    realNetworkCount = networks.size();
+    appendHiddenNetworkEntry();
+    shouldTrySavedNetwork = autoConnecting && !manualNetworkListRequested;
   }
-
-  // Sort: saved-password networks first, then by signal strength (strongest first)
-  std::sort(networks.begin(), networks.end(), [](const WifiNetworkInfo& a, const WifiNetworkInfo& b) {
-    if (a.hasSavedPassword != b.hasSavedPassword) {
-      return a.hasSavedPassword;
-    }
-    return a.rssi > b.rssi;
-  });
-
-  realNetworkCount = networks.size();
-  appendHiddenNetworkEntry();
 
   WiFi.scanDelete();
   LOG_INF("WIFI", "WiFi scan usable networks=%zu hidden=%d duplicates=%d", realNetworkCount, hiddenNetworks,
           duplicateNetworks);
 
-  if (autoConnecting && !manualNetworkListRequested && tryNextSavedNetworkFromScan()) {
+  if (shouldTrySavedNetwork && tryNextSavedNetworkFromScan()) {
     return;
   }
 
@@ -557,10 +568,10 @@ void WifiSelectionActivity::promptHiddenSsid() {
 
   // Suppress rendering during the activity transition (see render()).
   state = WifiSelectionState::HIDDEN_SSID_ENTRY;
-  startActivityForResult(std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_ENTER_WIFI_SSID),
-                                                                 "",  // No initial text
-                                                                 32,  // Max SSID length (IEEE 802.11: 32 bytes)
-                                                                 InputType::Text),
+  startActivityForResult(makeUniqueNoThrow<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_ENTER_WIFI_SSID),
+                                                                  "",  // No initial text
+                                                                  32,  // Max SSID length (IEEE 802.11: 32 bytes)
+                                                                  InputType::Text),
                          [this](const ActivityResult& result) {
                            if (result.isCancelled) {
                              state = WifiSelectionState::NETWORK_LIST;
@@ -694,10 +705,10 @@ void WifiSelectionActivity::attemptConnection() {
   WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
   WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
 
-  // Set hostname so routers show "CrossPoint-Reader-AABBCCDDEEFF" instead of "esp32-XXXXXXXXXXXX"
+  // Set hostname so routers show "CrossDiTo-Reader-AABBCCDDEEFF" instead of "esp32-XXXXXXXXXXXX"
   String mac = WiFi.macAddress();
   mac.replace(":", "");
-  String hostname = "CrossPoint-Reader-" + mac;
+  String hostname = "CrossDiTo-Reader-" + mac;
   WiFi.setHostname(hostname.c_str());
 
   wl_status_t beginStatus = WL_IDLE_STATUS;

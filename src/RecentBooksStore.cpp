@@ -17,6 +17,16 @@ constexpr char RECENT_BOOKS_FILE_BIN[] = "/.crosspoint/recent.bin";
 constexpr char RECENT_BOOKS_FILE_BAK[] = "/.crosspoint/recent.bin.bak";
 }  // namespace
 
+void RecentBooksStore::ensureLoaded() const {
+  if (loadState.load(std::memory_order_acquire) == 2) return;
+  const_cast<RecentBooksStore*>(this)->loadFromFile();
+}
+
+bool RecentBooksStore::saveToFile() const {
+  ensureLoaded();
+  return PersistableStore<RecentBooksStore>::saveToFile();
+}
+
 void RecentBooksStore::toJson(JsonDocument& doc) const {
   JsonArray arr = doc["books"].to<JsonArray>();
   for (const auto& book : recentBooks) {
@@ -189,7 +199,28 @@ RecentBook RecentBooksStore::getDataFromBook(std::string path) const {
   return RecentBook{path, "", "", ""};
 }
 
+const std::vector<RecentBook>& RecentBooksStore::getBooks() const {
+  ensureLoaded();
+  return recentBooks;
+}
+
+int RecentBooksStore::getCount() const {
+  ensureLoaded();
+  return static_cast<int>(recentBooks.size());
+}
+
 bool RecentBooksStore::loadFromFile() {
+  uint8_t expected = 0;
+  if (loadState.compare_exchange_strong(expected, 1, std::memory_order_acq_rel)) {
+    loadSucceeded = loadFromFileImpl();
+    loadState.store(2, std::memory_order_release);
+    return loadSucceeded;
+  }
+  while (loadState.load(std::memory_order_acquire) == 1) delay(1);
+  return loadSucceeded;
+}
+
+bool RecentBooksStore::loadFromFileImpl() {
   const bool hasStoreFile = Storage.exists(getFilePath());
   if (PersistableStore<RecentBooksStore>::loadFromFile()) {
     return true;
@@ -200,7 +231,7 @@ bool RecentBooksStore::loadFromFile() {
 
   if (Storage.exists(RECENT_BOOKS_FILE_BIN)) {
     if (loadFromBinaryFile()) {
-      saveToFile();
+      PersistableStore<RecentBooksStore>::saveToFile();
       Storage.rename(RECENT_BOOKS_FILE_BIN, RECENT_BOOKS_FILE_BAK);
       LOG_DBG("RBS", "Migrated recent.bin to recent.json");
       return true;

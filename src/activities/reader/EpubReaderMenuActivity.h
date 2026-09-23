@@ -38,7 +38,7 @@ class EpubReaderMenuActivity final : public Activity {
       void* endGlobalSettingsEditContext = nullptr, const char* dictionaryFontFamilyName = nullptr,
       uint8_t dictionaryFontPointSize = 0, bool hasDictionaryFontOverride = false,
       ReaderOptionsActivity::DictionaryFontChangedCallback dictionaryFontChangedCallback = nullptr,
-      void* dictionaryFontChangedContext = nullptr);
+      void* dictionaryFontChangedContext = nullptr, bool hasPreviousReadingPosition = false);
 
   void onEnter() override;
   void onExit() override;

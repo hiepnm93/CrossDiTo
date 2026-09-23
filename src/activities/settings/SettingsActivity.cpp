@@ -147,7 +147,7 @@ std::string formatCompactDuration(const uint32_t seconds) {
 
 void drawSystemVersionFooter(const GfxRenderer& renderer, const int pageWidth, const int pageHeight,
                              const ThemeMetrics& metrics) {
-  const std::string label = "CrossInk " CROSSINK_VERSION;
+  const std::string label = CROSSDITO_VERSION_PROVENANCE_LABEL;
   const int maxWidth = pageWidth - systemVersionFooterSideMargin * 2;
   const int bottomLineY =
       pageHeight - metrics.buttonHintsHeight - metrics.verticalSpacing - systemVersionFooterBottomInset;
@@ -210,6 +210,13 @@ std::string formatSettingValue(const SettingInfo& setting) {
   }
   if (setting.valuePtr == &CrossPointSettings::clockUtcOffsetQ) {
     return formatUtcOffset(SETTINGS.*(setting.valuePtr));
+  }
+  if (setting.valuePtr == &CrossPointSettings::frontlightScheduleStartQ ||
+      setting.valuePtr == &CrossPointSettings::frontlightScheduleEndQ) {
+    char valueBuffer[9];
+    FrontlightSchedule::formatTimeSlot(SETTINGS.*(setting.valuePtr), SETTINGS.clockFormat == 1, valueBuffer,
+                                       sizeof(valueBuffer));
+    return valueBuffer;
   }
   return std::to_string(SETTINGS.*(setting.valuePtr));
 }
@@ -303,6 +310,16 @@ void SettingsActivity::rebuildSettingsLists() {
   dictionaryRegistry.refreshIfDirty();
   const auto allSettings = getSettingsList(needsFonts ? &sdFontSystem.registry() : nullptr, &dictionaryRegistry);
   displaySettings = buildGroupedDisplaySettingsList(allSettings);
+#if FREEINK_CAP_FRONTLIGHT
+  if (SETTINGS.frontlightScheduleEnabled == 0) {
+    displaySettings.erase(std::remove_if(displaySettings.begin(), displaySettings.end(),
+                                         [](const SettingInfo& setting) {
+                                           return setting.valuePtr == &CrossPointSettings::frontlightScheduleStartQ ||
+                                                  setting.valuePtr == &CrossPointSettings::frontlightScheduleEndQ;
+                                         }),
+                          displaySettings.end());
+  }
+#endif
 #ifndef SIMULATOR
   if (BoardConfig::isX4Pro() || CROSSINK_APP_DEVICE_X4CLASSIC) {
     displaySettings.erase(
@@ -661,8 +678,8 @@ void SettingsActivity::openStringEditor(const SettingInfo& setting) {
   const size_t maxLength = setting.stringMaxLen > 0 ? setting.stringMaxLen - 1 : 0;
   const size_t minLength = setting.nameId == StrId::STR_DEVICE_NAME ? CrossPointSettings::MIN_DEVICE_NAME_LENGTH : 0;
   const SettingInfo selectedSetting = setting;
-  startActivityForResult(std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, I18N.get(setting.nameId),
-                                                                 initialText, maxLength, InputType::Text, minLength),
+  startActivityForResult(makeUniqueNoThrow<KeyboardEntryActivity>(renderer, mappedInput, I18N.get(setting.nameId),
+                                                                  initialText, maxLength, InputType::Text, minLength),
                          [this, selectedSetting](const ActivityResult& result) {
                            if (result.isCancelled) {
                              requestUpdate();
@@ -993,10 +1010,16 @@ void SettingsActivity::toggleCurrentSetting() {
     return;
   }
   if (setting.valuePtr == &CrossPointSettings::clockUtcOffsetQ) {
-    startActivityForResult(std::make_unique<ClockOffsetActivity>(renderer, mappedInput), [this](const ActivityResult&) {
-      SETTINGS.saveToFile();
-      requestUpdate();
-    });
+    startActivityForResult(makeUniqueNoThrow<ClockOffsetActivity>(renderer, mappedInput),
+                           [this](const ActivityResult&) {
+                             SETTINGS.saveToFile();
+                             requestUpdate();
+                           });
+    return;
+  }
+  if (setting.valuePtr == &CrossPointSettings::frontlightScheduleStartQ ||
+      setting.valuePtr == &CrossPointSettings::frontlightScheduleEndQ) {
+    openFrontlightScheduleTimePicker(setting);
     return;
   }
   if (setting.type == SettingType::STRING) {
@@ -1004,7 +1027,7 @@ void SettingsActivity::toggleCurrentSetting() {
     return;
   }
   if (setting.nameId == StrId::STR_FONT_FAMILY && setting.type == SettingType::ENUM) {
-    startActivityForResult(std::make_unique<FontSelectionActivity>(renderer, mappedInput, &sdFontSystem.registry()),
+    startActivityForResult(makeUniqueNoThrow<FontSelectionActivity>(renderer, mappedInput, &sdFontSystem.registry()),
                            [this](const ActivityResult&) {
                              SETTINGS.saveToFile();
                              rebuildSettingsLists();
@@ -1032,7 +1055,7 @@ void SettingsActivity::toggleCurrentSetting() {
   } else if (setting.type == SettingType::ENUM && setting.valueGetter && setting.valueSetter) {
     if (setting.nameId == StrId::STR_FONT_FAMILY) {
       // Launch font selection submenu instead of cycling
-      startActivityForResult(std::make_unique<FontSelectionActivity>(renderer, mappedInput, &sdFontSystem.registry()),
+      startActivityForResult(makeUniqueNoThrow<FontSelectionActivity>(renderer, mappedInput, &sdFontSystem.registry()),
                              [this](const ActivityResult&) {
                                SETTINGS.saveToFile();
                                rebuildSettingsLists();
@@ -1056,19 +1079,19 @@ void SettingsActivity::toggleCurrentSetting() {
 
     switch (setting.action) {
       case SettingAction::RemapFrontButtons:
-        startActivityForResult(std::make_unique<ButtonRemapActivity>(renderer, mappedInput, false), resultHandler);
+        startActivityForResult(makeUniqueNoThrow<ButtonRemapActivity>(renderer, mappedInput, false), resultHandler);
         break;
       case SettingAction::RemapFrontButtonsReader:
-        startActivityForResult(std::make_unique<ButtonRemapActivity>(renderer, mappedInput, true), resultHandler);
+        startActivityForResult(makeUniqueNoThrow<ButtonRemapActivity>(renderer, mappedInput, true), resultHandler);
         break;
       case SettingAction::CustomiseStatusBar:
-        startActivityForResult(std::make_unique<StatusBarSettingsActivity>(renderer, mappedInput), resultHandler);
+        startActivityForResult(makeUniqueNoThrow<StatusBarSettingsActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::KOReaderSync:
-        startActivityForResult(std::make_unique<KOReaderSettingsActivity>(renderer, mappedInput), resultHandler);
+        startActivityForResult(makeUniqueNoThrow<KOReaderSettingsActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::OPDSBrowser:
-        startActivityForResult(std::make_unique<OpdsServerListActivity>(renderer, mappedInput), resultHandler);
+        startActivityForResult(makeUniqueNoThrow<OpdsServerListActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::Network:
         startActivityForResult(std::make_unique<WifiSelectionActivity>(renderer, mappedInput, false),
@@ -1085,12 +1108,12 @@ void SettingsActivity::toggleCurrentSetting() {
                                });
         break;
       case SettingAction::BackupStats:
-        startActivityForResult(std::make_unique<BackupStatsActivity>(renderer, mappedInput), resultHandler);
+        startActivityForResult(makeUniqueNoThrow<BackupStatsActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::ResetGlobalStats:
         startActivityForResult(
-            std::make_unique<ConfirmationActivity>(renderer, mappedInput, tr(STR_RESET_ALL_TIME_STATS),
-                                                   tr(STR_RESET_ALL_TIME_STATS_CONFIRM)),
+            makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_RESET_ALL_TIME_STATS),
+                                                    tr(STR_RESET_ALL_TIME_STATS_CONFIRM)),
             [this](const ActivityResult& result) {
               if (!result.isCancelled && !GlobalReadingStats::resetLocal()) {
                 LOG_ERR("SET", "Failed to reset all-time reading stats");
@@ -1099,13 +1122,13 @@ void SettingsActivity::toggleCurrentSetting() {
             });
         break;
       case SettingAction::ClearCache:
-        startActivityForResult(std::make_unique<ClearCacheActivity>(renderer, mappedInput), resultHandler);
+        startActivityForResult(makeUniqueNoThrow<ClearCacheActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::CheckForUpdates:
         silentRestartToNetwork(NetworkBootTarget::OTA);
         break;
       case SettingAction::SdFirmwareUpdate:
-        startActivityForResult(std::make_unique<SdFirmwareUpdateActivity>(renderer, mappedInput), resultHandler);
+        startActivityForResult(makeUniqueNoThrow<SdFirmwareUpdateActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::DownloadFonts:
         silentRestartToManageFonts();
@@ -1117,7 +1140,7 @@ void SettingsActivity::toggleCurrentSetting() {
         startActivityForResult(std::make_unique<KeyboardLayoutsActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::ClockSync:
-        startActivityForResult(std::make_unique<ClockSyncActivity>(renderer, mappedInput), resultHandler);
+        startActivityForResult(makeUniqueNoThrow<ClockSyncActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::QuickActions:
         startActivityForResult(std::make_unique<QuickActionsActivity>(renderer, mappedInput), resultHandler);
@@ -1185,7 +1208,7 @@ void SettingsActivity::syncQuickResumeTimeoutForSleepScreen(bool sleepScreenChan
 
 void SettingsActivity::openSleepTimeoutPicker() {
   startActivityForResult(
-      std::make_unique<IntervalSelectionActivity>(
+      makeUniqueNoThrow<IntervalSelectionActivity>(
           renderer, mappedInput, "SleepTimeoutInterval", StrId::STR_TIME_TO_SLEEP, SETTINGS.sleepTimeoutMinutes,
           CrossPointSettings::MIN_SLEEP_TIMEOUT_MINUTES, CrossPointSettings::MAX_SLEEP_TIMEOUT_MINUTES, 1, 5,
           StrId::STR_SLEEP_TIMER_VALUE_FORMAT,
@@ -1202,9 +1225,35 @@ void SettingsActivity::openSleepTimeoutPicker() {
       });
 }
 
+void SettingsActivity::openFrontlightScheduleTimePicker(const SettingInfo& setting) {
+  if (setting.valuePtr == nullptr) return;
+
+  const auto valuePtr = setting.valuePtr;
+  const char* activityName =
+      valuePtr == &CrossPointSettings::frontlightScheduleStartQ ? "FrontlightScheduleStart" : "FrontlightScheduleEnd";
+  startActivityForResult(
+      makeUniqueNoThrow<IntervalSelectionActivity>(
+          renderer, mappedInput, activityName, setting.nameId, SETTINGS.*valuePtr, 0,
+          CrossPointSettings::FRONTLIGHT_SCHEDULE_SLOT_COUNT - 1, 1, FrontlightSchedule::SLOTS_PER_HOUR,
+          StrId::STR_NONE_OPT, /*readerActivity=*/false, /*allowPowerAsConfirm=*/false,
+          /*ignoreInitialConfirmRelease=*/true, /*showPercentValue=*/false, StrId::STR_NONE_OPT,
+          /*overrideDisabledReaderTouchscreen=*/false, /*showTouchHeaderBackButton=*/true,
+          /*showClockTimeValue=*/true),
+      [this, valuePtr](const ActivityResult& result) {
+        if (!result.isCancelled) {
+          const uint32_t slot = std::get<IntervalResult>(result.data).value;
+          SETTINGS.*valuePtr =
+              static_cast<uint8_t>(std::min<uint32_t>(slot, CrossPointSettings::FRONTLIGHT_SCHEDULE_SLOT_COUNT - 1));
+          SETTINGS.saveToFile();
+        }
+        rebuildSettingsLists();
+        requestUpdate();
+      });
+}
+
 void SettingsActivity::openLineHeightPicker() {
   startActivityForResult(
-      std::make_unique<IntervalSelectionActivity>(
+      makeUniqueNoThrow<IntervalSelectionActivity>(
           renderer, mappedInput, "LineHeightInterval", StrId::STR_LINE_SPACING, SETTINGS.lineHeightPercent,
           CrossPointSettings::MIN_LINE_HEIGHT_PERCENT, CrossPointSettings::MAX_LINE_HEIGHT_PERCENT, 1, 5,
           StrId::STR_NONE_OPT, /*readerActivity=*/false,
@@ -1236,7 +1285,7 @@ void SettingsActivity::openFrontlightScheduleTimePicker(uint16_t CrossPointSetti
 
 void SettingsActivity::openIdleTimeThresholdPicker() {
   startActivityForResult(
-      std::make_unique<IntervalSelectionActivity>(
+      makeUniqueNoThrow<IntervalSelectionActivity>(
           renderer, mappedInput, "IdleTimeThresholdInterval", StrId::STR_IDLE_TIME_THRESHOLD,
           SETTINGS.getReadingIdleTimeThresholdSeconds(), CrossPointSettings::MIN_READING_IDLE_TIME_THRESHOLD_SECONDS,
           CrossPointSettings::MAX_READING_IDLE_TIME_THRESHOLD_SECONDS,

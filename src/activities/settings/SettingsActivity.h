@@ -304,6 +304,7 @@ class SettingsActivity final : public Activity {
   void openWordSpacingPicker();
   void openLanguagePicker();
   void openIdleTimeThresholdPicker();
+  void openFrontlightScheduleTimePicker(const SettingInfo& setting);
   void toggleCurrentSetting();
   void openSleepTimeoutPicker();
   void openLineHeightPicker();

@@ -159,7 +159,7 @@ void ReaderActivity::onGoToEpubReader(std::unique_ptr<Epub> epub,
 }
 
 void ReaderActivity::onGoToBmpViewer(const std::string& path) {
-  activityManager.replaceActivity(std::make_unique<BmpViewerActivity>(renderer, mappedInput, path));
+  activityManager.replaceActivity(makeUniqueNoThrow<BmpViewerActivity>(renderer, mappedInput, path));
 }
 
 void ReaderActivity::onGoToXtcReader(std::unique_ptr<Xtc> xtc) {

@@ -17,7 +17,7 @@ class UITheme {
   static UITheme& getInstance() { return instance; }
 
   const ThemeMetrics& getMetrics() const;
-  const BaseTheme& getTheme() const { return *currentTheme; }
+  const BaseTheme& getTheme() const { return currentTheme ? *currentTheme : emergencyTheme; }
   Rect getScreenSafeArea(const GfxRenderer& renderer, bool hasFrontButtonHints = false,
                          bool hasSideButtonHints = false);
   static void drawCenteredText(const GfxRenderer& renderer, Rect screen, int fontId, int y, const char* text,
@@ -53,7 +53,8 @@ class UITheme {
   static int getTopStatusBarInset(const GfxRenderer& renderer);
 
  private:
-  const ThemeMetrics* currentMetrics;
+  BaseTheme emergencyTheme;
+  const ThemeMetrics* currentMetrics = &BaseMetrics::values;
   std::unique_ptr<BaseTheme> currentTheme;
   mutable ThemeMetrics adjustedMetrics;
   mutable bool metricsValid = false;

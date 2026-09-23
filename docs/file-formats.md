@@ -134,6 +134,77 @@ if (parsedSize != fileSize) {
 }
 ```
 
+## `book_pages.bin`
+
+### Version 2
+
+`book_pages.bin` is written only after cooperative Full Book indexing has
+finalized every EPUB spine section for one reader layout. The visible page is
+rendered first; pagination then advances by one page between reader-loop input
+checks. Its layout signature covers the font, spacing, viewport, styling,
+image, and render-mode inputs used by section-cache validation. A changed
+layout therefore makes the index ineligible and starts a fresh background pass
+when Full Book indexing is selected.
+
+Each completed spine appends one cumulative offset to `book_pages.bin.tmp` and
+closes the file before foreground rendering can use the SD card. The temporary
+file is promoted atomically only after the final total is synced and read-back
+validation succeeds. Leaving the reader removes the incomplete index while
+retaining reusable partial section caches. Version 1 indexes are deliberately
+discarded so firmware that used the former blocking render-task pass cannot be
+reused after an interrupted lifecycle.
+
+Binary layout:
+
+- `u32 magic` (`0x49504243`, the little-endian bytes `CBPI`)
+- `u8 version` (`2`)
+- `u32 readerLayoutSignature`
+- `u16 spineCount`
+- `u32 totalPageCount`
+- `u32 spinePageOffsets[spineCount + 1]`
+
+`spinePageOffsets[i]` is the number of laid-out pages before spine `i`. The
+final entry equals `totalPageCount`, so the current whole-book page is
+`spinePageOffsets[currentSpine] + currentSectionPage + 1`.
+
+## `compiled/<spine>.bin`
+
+### Version 1
+
+Each completed EPUB spine can store a layout-neutral stream of Expat events.
+Unlike `sections/<spine>.bin`, this cache does not contain page positions, font
+metrics, or rendered words, so it remains reusable after font, margin,
+orientation, spacing, and viewport changes. Replaying it skips XML tokenization
+but still sends every event through the normal style and pagination logic.
+
+Binary layout:
+
+- `u32 magic` (`0x545843FF`, little-endian bytes `FF 43 58 54`)
+- `u8 version` (`1`)
+- `u32 sourceHtmlSize`
+- repeated records:
+  - `u8 type`
+  - `u16 payloadLength`
+  - `u8 payload[payloadLength]`
+
+Record types are:
+
+- `1` — start element. The payload is `u8 attributeCount`, followed by the
+  NUL-terminated element name and `attributeCount` NUL-terminated name/value
+  pairs.
+- `2` — character data. The payload is the exact byte span supplied by Expat.
+- `3` — expanded default data. The payload is the exact byte span supplied by
+  Expat.
+- `4` — end element. The payload is the NUL-terminated element name.
+- `255` — end of stream. Its payload length must be zero and it must end the
+  file exactly.
+
+Payloads are bounded at 4096 bytes. The writer uses a temporary `.part` file
+and promotes it only after a complete, well-formed parse and a synced end
+marker. Before replay, CrossDiTo validates the header, source HTML size, every
+record boundary, every string, and the final marker. An invalid cache is
+removed and the original XHTML is parsed normally in the same book-open flow.
+
 ## `reader_settings.bin`
 
 ### Version 9
@@ -168,7 +239,7 @@ struct ReaderSettingsBin {
     u8 version; // 9
     u8 flags;   // bit 0 = custom reader settings, bit 1 = custom auto-page-turn interval, bit 2 = render mode override, bit 3 = dictionary font override
     u16 autoPageTurnSeconds;
-    u8 renderMode; // 0 = CrossInk Default, 1 = Balanced, 2 = Light
+    u8 renderMode; // 0 = CrossDiTo Default, 1 = Balanced, 2 = Light
 
     u8 fontFamily;
     u8 readerFontPointSize; // physical point size; versions 2-5 stored a size slot
@@ -188,7 +259,7 @@ struct ReaderSettingsBin {
     u8 focusReadingEnabled;
     u8 guideReadingEnabled;
     u8 snapshotRenderMode;
-    u8 indexingMethod; // 0 = incremental, 1 = full section
+    u8 indexingMethod; // 0 = incremental, 1 = full section, 2 = full book
     char sdFontFamilyName[64];
     char dictionarySdFontFamilyName[64]; // meaningful only when flag bit 3 is set
     u8 dictionaryFontPointSize; // 0 = follow reader size
@@ -200,7 +271,7 @@ struct ReaderSettingsBin {
 ### Versions 1-4
 
 Clipping files store the per-book EPUB clipping list used by the reader. A
-saved clipping is also what CrossInk renders as an in-reader highlight; there is
+saved clipping is also what CrossDiTo renders as an in-reader highlight; there is
 no separate highlight file. The file lives in `/.crosspoint/clippings/` instead
 of the EPUB render-cache directory so clearing/rebuilding layout cache does not
 delete user clippings.
@@ -245,14 +316,14 @@ The clipping selector has a separate navigation bound: it exposes at most
 selection window for low-memory devices, not a character-count limit. The
 selected text is still stored separately and is limited to `4096` UTF-8 bytes.
 
-CrossInk uses the stored spine/page/paragraph fields as anchors, then searches
+CrossDiTo uses the stored spine/page/paragraph fields as anchors, then searches
 near that location for the stored clipping text after relayout. This is similar
 to keeping both a DOM position and a text quote in a web app: the numeric
 position gives a fast starting point, while the text makes jumps and highlights
 survive font, layout, or page-count changes when possible.
 
 Version 3 records which reader layout produced the numeric page/word anchor.
-When that signature differs, CrossInk ignores the stale numeric range and
+When that signature differs, CrossDiTo ignores the stale numeric range and
 matches the saved text instead, including when both layouts happen to have the
 same total page count. Legacy records without a layout signature use text
 matching rather than trusting ambiguous numeric ranges. Version 4 adds the
@@ -264,9 +335,9 @@ bytes of the selected text and is append-only. Removing a clipping from the
 reader deletes or rewrites only the binary clipping file; it does not remove
 previous entries from `/My Clippings.txt`.
 
-When CrossInk moves an EPUB through its built-in move-to-Read flow, it rewrites
+When CrossDiTo moves an EPUB through its built-in move-to-Read flow, it rewrites
 the clipping file under the new path-derived name and removes the old one. If a
-book is renamed or moved outside CrossInk, the path hash changes, so the old
+book is renamed or moved outside CrossDiTo, the path hash changes, so the old
 clipping file may no longer be associated with the book until the file is moved
 back or the clipping store is migrated.
 
@@ -280,7 +351,7 @@ their own per-book stats files without overwriting each other. Version 5 extends
 version 4 with a cached live reader book time-left estimate so Home and Reading
 Stats can show the same estimate the reader last computed.
 
-When `stats_v5.bin` is missing, CrossInk can read the previous versioned stats
+When `stats_v5.bin` is missing, CrossDiTo can read the previous versioned stats
 filename (`stats_v4.bin` for version 5, `stats_v5.bin` after a future version 6
 bump) before falling back to legacy `stats.bin` files with compatible stats
 payloads. Future changes are always saved to the current versioned filename.
@@ -353,6 +424,10 @@ version byte `61`, and suspended partials use sentinel byte `0xF8`.
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the
 current reader settings, the section is discarded and rebuilt.
+
+Version 60 reserves page-edge room for ruby annotation overhang and prefers
+longer CJK lines when candidate breaks have equal cost. Both changes affect
+pagination, so complete and suspended partial caches from version 59 rebuild.
 
 Version 59 adds a compact page-start visible-text-offset lookup table. The
 offset is a Unicode codepoint coordinate in the spine XHTML, so reader progress
@@ -636,7 +711,7 @@ struct SectionBin {
     bool focusReadingEnabled;
     bool guideReadingEnabled;
     u8 wordSpacing;
-    u8 renderMode; // 0 = CrossInk Default, 1 = Balanced, 2 = Light
+    u8 renderMode; // 0 = CrossDiTo Default, 1 = Balanced, 2 = Light
 
     u16 pageCount;
     u32 protectedImageUnits;

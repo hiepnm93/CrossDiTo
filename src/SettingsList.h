@@ -682,8 +682,9 @@ inline const std::vector<SettingInfo>& getBaseSettingsList() {
     add(SettingInfo::Toggle(StrId::STR_GUIDE_READING, &CrossPointSettings::guideReadingEnabled, "guideReadingEnabled",
                             StrId::STR_CAT_READER));
     add(SettingInfo::Enum(StrId::STR_INDEXING_METHOD, &CrossPointSettings::indexingMethod,
-                          {StrId::STR_INDEXING_INCREMENTAL, StrId::STR_INDEXING_FULL_SECTION}, "indexingMethod",
-                          StrId::STR_CAT_READER));
+                          {StrId::STR_INDEXING_INCREMENTAL, StrId::STR_INDEXING_FULL_SECTION,
+                           StrId::STR_INDEXING_FULL_BOOK},
+                          "indexingMethod", StrId::STR_CAT_READER));
 
     // --- Controls ---
     add(SettingInfo::Toggle(StrId::STR_PINCH_FONT_RESIZE, &CrossPointSettings::pinchFontResizeEnabled,
@@ -870,8 +871,9 @@ inline const std::vector<SettingInfo>& getBaseSettingsList() {
         "koSyncBehavior", StrId::STR_KOREADER_SYNC));
 
     // --- Status Bar Settings (web-only, uses StatusBarSettingsActivity) ---
-    add(SettingInfo::Toggle(StrId::STR_CHAPTER_PAGE_COUNT, &CrossPointSettings::statusBarChapterPageCount,
-                            "statusBarChapterPageCount", StrId::STR_CUSTOMISE_STATUS_BAR));
+    add(SettingInfo::Enum(StrId::STR_PAGE_COUNT, &CrossPointSettings::statusBarChapterPageCount,
+                          {StrId::STR_HIDE, StrId::STR_CHAPTER, StrId::STR_BOOK}, "statusBarChapterPageCount",
+                          StrId::STR_CUSTOMISE_STATUS_BAR));
     add(SettingInfo::Toggle(StrId::STR_STABLE_PAGE_NUMBERS, &CrossPointSettings::stablePageNumbers, "stablePageNumbers",
                             StrId::STR_CUSTOMISE_STATUS_BAR));
     add(SettingInfo::Toggle(StrId::STR_BOOK_PROGRESS_PERCENTAGE, &CrossPointSettings::statusBarBookProgressPercentage,
@@ -1312,6 +1314,11 @@ inline std::vector<SettingInfo> buildGroupedDisplaySettingsList(const std::vecto
   if (halClock.isAvailable()) {
     addDisplaySetting(StrId::STR_HIDE_CLOCK);
   }
+  // Keep the frontlight schedule beside the clock controls so it is visible
+  // without scrolling on the X4 Pro's first Display-settings page.
+  addDisplaySetting(StrId::STR_FRONTLIGHT_SCHEDULE);
+  addDisplaySetting(StrId::STR_FRONTLIGHT_SCHEDULE_START);
+  addDisplaySetting(StrId::STR_FRONTLIGHT_SCHEDULE_END);
   addDisplaySetting(StrId::STR_REFRESH_FREQ);
   addDisplaySetting(StrId::STR_NIGHT_MODE);
   addDisplaySetting(StrId::STR_UI_THEME);

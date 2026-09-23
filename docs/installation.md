@@ -5,51 +5,33 @@ nav_order: 2
 
 # Installation
 
-## Supported Devices
+## Supported Device
 
-- Xteink X3, X4
-- Xteink X4 Classic and X4 Pro
-- Seeed Studio Sticky
+- Xteink X4 Pro
 
-Don't have a device yet? Get one directly from [Xteink](https://go.sjv.io/X4RGBb) or [Seeed Studio](https://www.seeedstudio.com/reTerminal-Sticky-p-6861.html?sensecap_affiliate=1Nxo3Gw&referring_service=link).
+## Download the verified firmware
 
-Note: Your purchases using the above affiliate links help support ongoing development of Crossink.
+Download `CrossDiTo-x4-pro-v1.5.1.bin` from the [CrossDiTo 1.5.1 release](https://github.com/dito94/CrossDiTo/releases/tag/v1.5.1).
 
-## Web Installation via USB
+The verified application image is 6,137,264 bytes and has this SHA-256 checksum:
 
-#### For new installs and updates.
+```text
+be7afe4ea3e55bfbd46a7935715872b864a6df14ddc2f521918d2c69e3e65463
+```
 
-1. Navigate to [https://inky.crossink.dev/#flash-tools](https://inky.crossink.dev/#flash-tools) and select your device model.
-2. The latest version will be automatically selected, but if you ever want to revert to an earlier build, you can select it from the dropdown.
-3. Choose the firmware option you want to install.
-4. Click on the "Flash Firmware" button
-
-X4 Pro uses the ESP32-S3 firmware option. Keep the reader connected during the
-download-mode and flashing steps shown by Inky.
-
-## USB Drive
-
-On X4 Pro, choose `Home > File Transfer > USB Drive` to expose the SD card to
-your computer. Eject the drive from the computer before disconnecting it; the
-reader restarts to Home when the drive is safely ejected or the cable is
-removed.
+The release image was flashed to an X4 Pro and read back in full with an exact checksum match.
 
 ## SD Card Firmware Update
 
-#### For installing newer versions of CrossInk. Can be used by USB locked devices.
+Use this method for an existing CrossDiTo installation. It also works when USB data transfer is unavailable.
 
-1. Follow the same steps from the Web Installation method above. There will be an option to download the firmware instead of USB flashing.
-2. Place the downloaded `firmware-*.bin` file on your SD card. You can place this file anywhere.
-3. Go to `Settings > System > SD Card Firmware Update` and navigate to the `.bin` file and update.
+1. Place the downloaded `CrossDiTo-x4-pro-v1.5.1.bin` file anywhere on the SD card.
+2. Go to `Settings > System > SD Card Firmware Update`.
+3. Select the `.bin` file and confirm the update.
 
-## USB Locked Devices
+## USB-locked devices
 
-If your device has USB data transfer disabled:
-
-1. Navigate to [https://inky.crossink.dev/#flash-tools](https://inky.crossink.dev/#flash-tools) and check the box for "I have a locked device" at the top.
-2. The latest version will be automatically selected, but if you ever want to revert to an earlier build, you can select it from the dropdown.
-3. Choose the firmware option you want to download.
-4. Click on the "Download update.bin" button and follow the instructions.
+Use the SD Card Firmware Update method above. It does not require USB data access.
 
 ## Command Line
 
@@ -61,7 +43,7 @@ Install `esptool`:
 pip3 install esptool
 ```
 
-Download the `firmware-*.bin` file from the [releases page](https://github.com/uxjulia/CrossInk/releases), then connect your device with USB-C.
+Download `CrossDiTo-x4-pro-v1.5.1.bin` from the [CrossDiTo releases page](https://github.com/dito94/CrossDiTo/releases), then connect the X4 Pro with USB-C.
 
 Find the device port:
 
@@ -73,14 +55,14 @@ dmesg | grep tty
 ls /dev/cu.*
 ```
 
-Flash the firmware:
+Flash the firmware using the X4 Pro's `esp32s3` target:
 
 ```sh
 # Linux
-esptool.py --chip esp32c3 --port /dev/ttyACM0 --baud 921600 write_flash 0x10000 /path/to/firmware.bin
+esptool.py --chip esp32s3 --port /dev/ttyACM0 --baud 921600 write_flash 0x10000 /path/to/CrossDiTo-x4-pro.bin
 
 # macOS
-esptool.py --chip esp32c3 --port /dev/cu.usbmodem2101 --baud 921600 write_flash 0x10000 /path/to/firmware.bin
+esptool.py --chip esp32s3 --port /dev/cu.usbmodem2101 --baud 921600 write_flash 0x10000 /path/to/CrossDiTo-x4-pro.bin
 ```
 
 Replace the port and firmware path with your actual values.

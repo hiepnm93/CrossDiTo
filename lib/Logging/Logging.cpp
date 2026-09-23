@@ -3,6 +3,7 @@
 #include <BoardConfig.h>
 #include <esp_rom_sys.h>
 
+#include <cstdint>
 #include <cstdio>
 #include <string>
 
@@ -18,6 +19,50 @@ void MySerialImpl::flush() { logSerial.flush(); }
 
 #define MAX_ENTRY_LEN 256
 #define MAX_LOG_LINES 16
+
+namespace {
+bool serialTransportStarted = false;
+bool serialTransportStartScheduled = false;
+unsigned long serialTransportStartAt = 0;
+}  // namespace
+
+void beginLogSerialTransportNow() {
+  if (serialTransportStarted) return;
+
+  // Web Serial sends file data in 256-byte chunks and waits for a one-byte
+  // acknowledgement. The default 256-byte RX queue leaves no safety margin.
+  logSerial.setRxBufferSize(1024);
+  logSerial.setTxBufferSize(1024);
+  logSerial.begin(115200);
+#if !defined(SIMULATOR) && LOG_SERIAL_HAS_TX_TIMEOUT
+  logSerial.setTxTimeoutMs(1);  // Keep writes non-blocking when no host is reading.
+#endif
+  serialTransportStarted = true;
+  serialTransportStartScheduled = false;
+}
+
+void scheduleLogSerialTransportStart(const unsigned long delayMs) {
+  if (serialTransportStarted) return;
+  serialTransportStartAt = millis() + delayMs;
+  serialTransportStartScheduled = true;
+}
+
+void serviceLogSerialTransport() {
+  if (!serialTransportStartScheduled || serialTransportStarted) return;
+  if (static_cast<int32_t>(millis() - serialTransportStartAt) < 0) return;
+  beginLogSerialTransportNow();
+}
+
+void endLogSerialTransport() {
+  if (!serialTransportStarted) return;
+#ifndef SIMULATOR
+  logSerial.end();
+#endif
+  serialTransportStarted = false;
+  serialTransportStartScheduled = false;
+}
+
+bool isLogSerialTransportStarted() { return serialTransportStarted; }
 
 // Simple ring buffer log, useful for error reporting when we encounter a crash
 RTC_NOINIT_ATTR char logMessages[MAX_LOG_LINES][MAX_ENTRY_LEN];
@@ -73,15 +118,15 @@ void logPrintf(const char* level, const char* origin, const char* format, ...) {
     }
   }
   va_end(args);
-#if defined(SIMULATOR)
+#if defined(ENABLE_SERIAL_LOG) && defined(SIMULATOR)
   std::fputs(buf, stderr);
-#elif FREEINK_LOG_TRANSPORT == FREEINK_LOG_TRANSPORT_ROM_PRINTF
+#elif defined(ENABLE_SERIAL_LOG) && FREEINK_LOG_TRANSPORT == FREEINK_LOG_TRANSPORT_ROM_PRINTF
   // IDF/ROM console path for boards monitored over USB-Serial-JTAG, where the
   // HWCDC `operator bool` reads false under `pio device monitor` and logs would
   // otherwise be silently dropped (e.g. Sticky).
   esp_rom_printf("%s", buf);
-#else
-  if (logSerial) {
+#elif defined(ENABLE_SERIAL_LOG)
+  if (serialTransportStarted && logSerial) {
     logSerial.print(buf);
   }
 #endif

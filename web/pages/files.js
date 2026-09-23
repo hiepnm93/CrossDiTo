@@ -3,7 +3,7 @@ const currentPath = decodeURIComponent(new URLSearchParams(window.location.searc
 
 if (currentPath !== "/") {
   const leaf = currentPath.split("/").filter(Boolean).pop();
-  if (leaf) document.title = leaf + " - Files - CrossInk Reader";
+  if (leaf) document.title = leaf + " - Files - CrossDiTo Reader";
 }
 
 // Network status monitoring
@@ -91,7 +91,7 @@ function formatFileSize(bytes) {
 }
 
 async function hydrate() {
-  // Fetch CrossInk version
+  // Fetch CrossDiTo version
   fetchVersion();
 
   // Close modals when clicking overlay - call proper cleanup functions
@@ -1424,16 +1424,9 @@ const WS_CHUNK_SIZE = 4096; // 4KB chunks - smaller for ESP32 stability
 // EPUB Image Conversion Functions (from Baseline JPEG Converter)
 // ============================================================================
 
-// Device profiles (short edge × long edge in portrait orientation)
-const DEVICE_PROFILES = {
-  X4: { width: 480, height: 800, label: "X4" },
-  X3: { width: 528, height: 792, label: "X3" },
-};
-
-// Default conversion settings
-const DEFAULT_DEVICE = "X4";
-const DEFAULT_MAX_WIDTH = DEVICE_PROFILES[DEFAULT_DEVICE].width;
-const DEFAULT_MAX_HEIGHT = DEVICE_PROFILES[DEFAULT_DEVICE].height;
+// CrossDiTo has one hardware target: X4 Pro in portrait orientation.
+const MAX_WIDTH = 480;
+const MAX_HEIGHT = 800;
 const DEFAULT_JPEG_QUALITY = 85;
 const DEFAULT_ENABLE_GRAYSCALE = true;
 const COVER_MAX_WIDTH = 480;
@@ -1442,11 +1435,6 @@ const X_DEFAULT_REFERENCE_CHARACTERS_PER_PAGE = 1500;
 // Note: Overlap is now always centered distribution (min 5%)
 
 // Dynamic conversion settings (updated by UI)
-let DEVICE_TARGET = "auto"; // 'auto' | 'X4' | 'X3'
-let DETECTED_DEVICE = null; // populated from /api/status
-let ACTIVE_DEVICE = DEFAULT_DEVICE;
-let MAX_WIDTH = DEFAULT_MAX_WIDTH;
-let MAX_HEIGHT = DEFAULT_MAX_HEIGHT;
 let JPEG_QUALITY = DEFAULT_JPEG_QUALITY;
 let ENABLE_GRAYSCALE = DEFAULT_ENABLE_GRAYSCALE;
 let HANDEDNESS = "right"; // 'right' = clockwise (right-handed), 'left' = counter-clockwise (left-handed)
@@ -1459,7 +1447,6 @@ const DEFAULT_UPLOAD_SETTINGS = Object.freeze({
   preserveCoverColor: true,
   quality: DEFAULT_JPEG_QUALITY,
   referenceCharacters: X_DEFAULT_REFERENCE_CHARACTERS_PER_PAGE,
-  deviceTarget: "auto",
   handedness: "right",
   overlap: 5,
   exportLog: false,
@@ -1477,7 +1464,6 @@ function getCurrentUploadSettings() {
       document.getElementById("referenceCharactersInput")?.value || X_DEFAULT_REFERENCE_CHARACTERS_PER_PAGE,
       10,
     ),
-    deviceTarget: DEVICE_TARGET,
     handedness: HANDEDNESS,
     overlap: OVERLAP_PERCENT,
     exportLog: !!document.getElementById("export-log-checkbox")?.checked,
@@ -1499,7 +1485,6 @@ function applyUploadSettings(settings = {}) {
     );
 
     setQualityPreset(Math.max(1, Math.min(95, parseInt(merged.quality, 10) || DEFAULT_JPEG_QUALITY)));
-    setDeviceTarget(["auto", "X3", "X4"].includes(merged.deviceTarget) ? merged.deviceTarget : "auto");
     setHandedness(merged.handedness === "left" ? "left" : "right");
     setOverlap([5, 10, 15].includes(Number(merged.overlap)) ? Number(merged.overlap) : 5);
     toggleConvertOptions();
@@ -1559,8 +1544,8 @@ const logSection = document.getElementById("log-section");
 const logContainer = document.getElementById("log-container");
 const exportLogCheckbox = document.getElementById("export-log-checkbox");
 
-// CrossInk version (fetched from API)
-let crosspointVersion = "Unknown";
+// CrossDiTo version (fetched from API)
+let firmwareVersion = "Unknown";
 
 // Fetch version from API
 async function fetchVersion() {
@@ -1568,55 +1553,11 @@ async function fetchVersion() {
     const response = await fetch("/api/status");
     if (response.ok) {
       const data = await response.json();
-      crosspointVersion = data.version || "Unknown";
-      if (data.device === "X3" || data.device === "X4") {
-        DETECTED_DEVICE = data.device;
-        applyDeviceTarget();
-      }
+      firmwareVersion = data.version || "Unknown";
     }
   } catch (e) {
     console.error("Failed to fetch version:", e);
   }
-}
-
-// Resolve DEVICE_TARGET ('auto' | 'X4' | 'X3') to a concrete profile and update UI.
-function applyDeviceTarget() {
-  const resolved = DEVICE_TARGET === "auto" ? DETECTED_DEVICE || DEFAULT_DEVICE : DEVICE_TARGET;
-  const profile = DEVICE_PROFILES[resolved] || DEVICE_PROFILES[DEFAULT_DEVICE];
-  ACTIVE_DEVICE = resolved;
-  MAX_WIDTH = profile.width;
-  MAX_HEIGHT = profile.height;
-
-  const summary = document.getElementById("convertSizeSummary");
-  if (summary) {
-    summary.textContent = `📏 Max ${profile.width}×${profile.height}px`;
-  }
-  document.querySelectorAll(".device-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.value === DEVICE_TARGET);
-  });
-  const autoLabel = document.getElementById("deviceAutoLabel");
-  if (autoLabel) {
-    autoLabel.textContent = DETECTED_DEVICE ? `Auto (${DETECTED_DEVICE})` : "Auto";
-  }
-
-  // Recompute picker classification with new dimensions, then refresh grid.
-  if (Array.isArray(epubImagesCache) && epubImagesCache.length > 0) {
-    for (const img of epubImagesCache) {
-      img.fitsScreen = img.width <= MAX_WIDTH && img.height <= MAX_HEIGHT;
-      img.canHSplit = img.width >= MAX_HEIGHT;
-      img.canVSplit = img.height >= MAX_HEIGHT;
-    }
-    const pickerSection = document.getElementById("imagePickerSection");
-    if (pickerSection && pickerSection.style.display !== "none" && typeof renderImageGrid === "function") {
-      renderImageGrid();
-    }
-  }
-}
-
-function setDeviceTarget(value) {
-  DEVICE_TARGET = value;
-  applyDeviceTarget();
-  updateUploadSettingsPersistence();
 }
 
 // Batch logging system for multiple files
@@ -1966,7 +1907,7 @@ function exportLogToFile(filename = null, isBatch = false) {
   }
   // Extract text from log entries
   const entries = logContainer.querySelectorAll(".log-entry");
-  let logText = `CrossInk Reader ${crosspointVersion} - EPUB Conversion Log\n`;
+  let logText = `CrossDiTo Reader ${firmwareVersion} - EPUB Conversion Log\n`;
   logText += `Generated: ${new Date().toLocaleString()}\n`;
   logText += `${"=".repeat(60)}\n\n`;
 
@@ -3195,7 +3136,7 @@ function buildXLocationManifest(
   const manifest = {
     format: "x-locations",
     version: 1,
-    generator: "crossink-web-uploader",
+    generator: "crossdito-web-uploader",
     unit: "word",
     referencePageUnit: "character",
     wordsPerLocation: X_LOCATION_WORDS_PER_UNIT,
@@ -4563,7 +4504,7 @@ async function convertEpubFile(file, progressCallback) {
         let modified = false;
 
         // Remove width/height attributes from ALL img tags (dimensions may have changed)
-        // This prevents CrossInk and other readers from using wrong dimensions
+        // This prevents CrossDiTo and other readers from using wrong dimensions
         const allImgElements = doc.querySelectorAll("img");
         for (const img of allImgElements) {
           if (img.hasAttribute("width")) {
