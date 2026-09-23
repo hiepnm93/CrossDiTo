@@ -880,8 +880,7 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
                               const int pageCount, const char* title, const int paddingBottom, const int textYOffset,
                               const bool isPageBookmarked, const char* timeLeftLabel, const bool darkMode,
                               const float chapterProgressPercent, const int stableCurrentPage,
-                              const int stablePageCount, const bool showProgress, const bool pageCountEstimated,
-                              const uint32_t wholeBookCurrentPage, const uint32_t wholeBookPageCount) const {
+                              const int stablePageCount, const bool showProgress, const bool pageCountEstimated) const {
   const bool foregroundBlack = !darkMode;
   auto metrics = UITheme::getInstance().getMetrics();
   int orientedMarginTop, orientedMarginRight, orientedMarginBottom, orientedMarginLeft;
@@ -896,8 +895,7 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
   int progressTextWidth = 0;
 
   const bool showStablePageNumbers = statusBar.showStablePageNumbers && stableCurrentPage > 0 && stablePageCount > 0;
-  const bool showPageCount = statusBar.pageCountMode != CrossPointSettings::PAGE_COUNT_HIDE;
-  if (showProgress && (statusBar.showBookProgressPercent || showPageCount || showStablePageNumbers)) {
+  if (showProgress && (statusBar.showBookProgressPercent || statusBar.showChapterPageCount || showStablePageNumbers)) {
     // Right aligned text for progress counter
     char progressStr[48];
     const int percentageDecimals =

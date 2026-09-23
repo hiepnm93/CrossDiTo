@@ -1108,7 +1108,7 @@ void enterDeepSleep(bool fromTimeout) {
   powerManager.startDeepSleep(gpio);
 }
 
-void setupDisplayAndFonts(const bool seamless, const bool loadReaderResources, const bool useReaderRenderStack) {
+bool setupDisplayAndFonts(const bool seamless, const bool loadReaderResources, const bool useReaderRenderStack) {
 #if !defined(SIMULATOR) && !FREEINK_MCU_C3
   // C3 X3/X4 detection already runs in HalGPIO::begin() before SPI owns the
   // panel pins. S3 boards initialize display SPI inside display.begin(), so an
@@ -1126,10 +1126,7 @@ void setupDisplayAndFonts(const bool seamless, const bool loadReaderResources, c
   (void)seamless;
   display.begin();
 #else
-  if (!display.begin(seamless)) {
-    LOG_ERR("MAIN", "Display initialization failed");
-    return false;
-  }
+  display.begin(seamless);
 #endif
   renderer.begin();
   display.setInverted(SETTINGS.screenInverted != 0);
@@ -1242,7 +1239,6 @@ void setup() {
   // configured shortcut wins; MappedInputManager mirrors it back to Confirm
   // only on screens that explicitly allow the fallback.
   gpio.setSharedConfirmPowerShortPressEmitsPower(true);
-#ifdef SIMULATOR
   powerManager.begin();
 
   const auto wakeupReason = gpio.getWakeupReason();
