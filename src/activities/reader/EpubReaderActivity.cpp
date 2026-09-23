@@ -7747,7 +7747,7 @@ void EpubReaderActivity::returnToPreviousReadingPosition() {
     resetPendingNavigationForJump();
     currentSpineIndex = position.spineIndex;
     nextPageNumber = std::max(0, position.pageNumber);
-    resetSection();
+    section.reset();
   }
   armReadingPaceWarmup("previous_position_return");
   requestUpdate();

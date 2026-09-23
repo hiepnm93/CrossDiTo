@@ -67,7 +67,7 @@ class EpubReaderMenuActivity final : public Activity {
 
   static TabMenuItems buildMenuItems(bool hasFootnotes, bool hasBookmarks, bool hasClippings,
                                      bool isCurrentPageBookmarked, bool isBookCompleted, bool showReadingPaceReset,
-                                     bool hasDictionary, bool hasStablePageNumbers);
+                                     bool hasDictionary, bool hasStablePageNumbers, bool hasPreviousReadingPosition);;
   [[nodiscard]] const std::vector<MenuItem>& activeMenuItems() const;
   [[nodiscard]] size_t activeTabIndex() const { return static_cast<size_t>(activeTab); }
   void cycleActiveTab();

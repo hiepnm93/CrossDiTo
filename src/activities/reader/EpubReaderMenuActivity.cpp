@@ -50,12 +50,7 @@ int readerMenuTabBarHeight(const int baseTabBarHeight, const bool hasTouch) {
 bool readerMenuTabsAtBottom(const MappedInputManager& mappedInput) {
   // Frontlight boards reserve the top-edge down-swipe for the quick panel, so
   // the reader menu opens from the bottom and its tabs should stay thumb-close.
-  if (mappedInput.hasTouch() && Frontlight.present()) {
-    return ReaderMenuTabLayout{height, topTabY + verticalSpacing, bottomInset + height + verticalSpacing,
-                               safe.y + safe.height - height, true};
-  }
-#endif
-  return ReaderMenuTabLayout{height, topTabY + height + verticalSpacing, bottomInset, topTabY, false};
+  return mappedInput.hasTouch() && Frontlight.present();
 }
 #endif
 
@@ -207,7 +202,7 @@ EpubReaderMenuActivity::EpubReaderMenuActivity(
     void* dictionaryFontChangedContext, const bool hasPreviousReadingPosition)
     : Activity("EpubReaderMenu", renderer, mappedInput),
       menuItems(buildMenuItems(hasFootnotes, hasBookmarks, hasClippings, isCurrentPageBookmarked, isBookCompleted,
-                               showReadingPaceReset, hasDictionary, stablePageCount > 0)),
+                               showReadingPaceReset, hasDictionary, stablePageCount > 0, hasPreviousReadingPosition)),
       title(title),
       pendingOrientation(currentOrientation),
       currentPage(currentPage),
@@ -238,7 +233,7 @@ EpubReaderMenuActivity::EpubReaderMenuActivity(
 
 EpubReaderMenuActivity::TabMenuItems EpubReaderMenuActivity::buildMenuItems(
     bool hasFootnotes, bool hasBookmarks, bool hasClippings, bool isCurrentPageBookmarked, bool isBookCompleted,
-    bool showReadingPaceReset, bool hasDictionary, bool hasStablePageNumbers) {
+    bool showReadingPaceReset, bool hasDictionary, bool hasStablePageNumbers, bool hasPreviousReadingPosition) {
   TabMenuItems items;
   auto& mainItems = items[MAIN_TAB_INDEX];
   auto& bookmarkItems = items[BOOKMARKS_TAB_INDEX];
@@ -248,9 +243,6 @@ EpubReaderMenuActivity::TabMenuItems EpubReaderMenuActivity::buildMenuItems(
   bookmarkItems.reserve(9 + (hasBookmarks ? 2u : 0u) + (hasClippings ? 1u : 0u));
   settingsItems.reserve(6);
 
-  if (hasPreviousReadingPosition) {
-    mainItems.push_back({MenuAction::RETURN_TO_PREVIOUS_POSITION, StrId::STR_RETURN_TO_PREVIOUS_POSITION});
-  }
   if (hasFootnotes) {
     mainItems.push_back({MenuAction::FOOTNOTES, StrId::STR_FOOTNOTES});
   }
@@ -259,6 +251,9 @@ EpubReaderMenuActivity::TabMenuItems EpubReaderMenuActivity::buildMenuItems(
     mainItems.push_back({MenuAction::LOOKUP_HISTORY, StrId::STR_LOOKUP_HISTORY});
   }
   mainItems.push_back({MenuAction::SELECT_CHAPTER, StrId::STR_SELECT_CHAPTER});
+  if (hasPreviousReadingPosition) {
+    mainItems.push_back({MenuAction::RETURN_TO_PREVIOUS_POSITION, StrId::STR_RETURN_TO_PREVIOUS_POSITION});
+  }
   mainItems.push_back({MenuAction::GO_TO_PERCENT, StrId::STR_GO_TO_PERCENT});
   if (hasStablePageNumbers) {
     mainItems.push_back({MenuAction::GO_TO_STABLE_PAGE, StrId::STR_GO_TO_STABLE_PAGE});
@@ -441,7 +436,7 @@ bool EpubReaderMenuActivity::activateSelectedItem() {
   }
 
   if (selectedAction == MenuAction::VIEW_CLIPPINGS) {
-    startActivityForResult(makeUniqueNoThrow<EpubReaderClippingListActivity>(renderer, mappedInput),
+    startActivityForResult(std::make_unique<EpubReaderClippingListActivity>(renderer, mappedInput),
                            [this](const ActivityResult& result) {
                              if (result.isCancelled) {
                                requestUpdate();
@@ -680,9 +675,9 @@ void EpubReaderMenuActivity::buildMenuScreen(UiApp::ScreenType& screen) {
 #endif
   // The legacy header, progress band, and icon tabs remain outside the app;
   // FreeInkUI owns the scalable list between them.
-  screen.setContentMargin(fui::Insets{static_cast<int16_t>(tabLayout.contentTop),
+  screen.setContentMargin(fui::Insets{static_cast<int16_t>(contentTop),
                                       static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width)),
-                                      static_cast<int16_t>(tabLayout.contentBottom), static_cast<int16_t>(safe.x)});
+                                      static_cast<int16_t>(contentBottom), static_cast<int16_t>(safe.x)});
 
   const auto& activeItems = activeMenuItems();
   std::vector<std::string> values(activeItems.size());
