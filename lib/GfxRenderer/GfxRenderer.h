@@ -16,7 +16,6 @@ enum class BidiBaseDir : signed char { AUTO = -1, LTR = 0, RTL = 1 };
 class FontCacheManager;
 class SdCardFont;
 
-#include <array>
 #include <cassert>
 #include <cstring>
 #include <deque>
@@ -44,8 +43,6 @@ class GfxRenderer {
 
  private:
   static constexpr size_t BW_BUFFER_CHUNK_SIZE = 8000;  // 8KB chunks to allow for non-contiguous memory
-  static constexpr size_t MAX_BW_BUFFER_CHUNKS =
-      (HalDisplay::BUFFER_SIZE + BW_BUFFER_CHUNK_SIZE - 1) / BW_BUFFER_CHUNK_SIZE;
 
   HalDisplay& display;
   RenderMode renderMode;
@@ -57,8 +54,7 @@ class GfxRenderer {
   uint16_t panelHeight = HalDisplay::DISPLAY_HEIGHT;
   uint16_t panelWidthBytes = HalDisplay::DISPLAY_WIDTH_BYTES;
   uint32_t frameBufferSize = HalDisplay::BUFFER_SIZE;
-  std::array<uint8_t*, MAX_BW_BUFFER_CHUNKS> bwBufferChunks{};
-  size_t bwBufferChunkCount = 0;
+  std::vector<uint8_t*> bwBufferChunks;
   std::map<int, EpdFontFamily> fontMap;
   // Shared bitmap row buffers. Every read/write must be inside BitmapScratchLock;
   // ensureBitmapScratchBuffers() asserts that contract before exposing them.
@@ -141,7 +137,13 @@ class GfxRenderer {
 
  public:
   explicit GfxRenderer(HalDisplay& halDisplay)
-      : display(halDisplay), renderMode(BW), orientation(Portrait), fadingFix(false) {}
+      : display(halDisplay),
+        renderMode(BW),
+        orientation(Portrait),
+        fadingFix(false),
+        bitmapScratchMutex_(xSemaphoreCreateMutex()) {
+    assert(bitmapScratchMutex_ != nullptr && "Failed to create GfxRenderer bitmap scratch mutex");
+  }
   GfxRenderer(const GfxRenderer&) = delete;
   GfxRenderer& operator=(const GfxRenderer&) = delete;
   GfxRenderer(GfxRenderer&&) = delete;
@@ -157,7 +159,7 @@ class GfxRenderer {
   static constexpr int VIEWABLE_MARGIN_LEFT = 3;
 
   // Setup
-  bool begin();  // must be called right after display.begin()
+  void begin();  // must be called right after display.begin()
   void insertFont(int fontId, EpdFontFamily font);
   // Clears both the flash-font map and any SD-font registration for fontId.
   // Coupled to avoid dangling SdCardFont* in sdCardFonts_ when callers free
@@ -237,9 +239,6 @@ class GfxRenderer {
   // Drawing
   bool isPixelBlack(int x, int y) const;
   void drawPixel(int x, int y, bool state = true) const;
-  // Fully visible, unrotated 1-bit glyphs bypass per-pixel clipping and
-  // coordinate transforms. Returns false when the regular path is required.
-  bool drawGlyphBitmap1BitFast(const uint8_t* bitmap, int width, int height, int x, int y, bool state = true) const;
   void drawLine(int x1, int y1, int x2, int y2, bool state = true) const;
   void drawLine(int x1, int y1, int x2, int y2, int lineWidth, bool state) const;
   void drawArc(int maxRadius, int cx, int cy, int xDir, int yDir, int lineWidth, bool state) const;

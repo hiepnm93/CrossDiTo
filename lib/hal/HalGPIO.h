@@ -138,7 +138,6 @@ class HalGPIO {
   void suppressTouchContact();
   bool isTouchTapCandidate(float& nx, float& ny, unsigned long& heldMs) const;
   bool wasTouchLongPress(float& nx, float& ny) const;
-  void suppressTouchContact();
   bool isTouchHeldAt(float& nx, float& ny) const;
   unsigned long lastTouchHeldMs() const;
   bool wasSwipe(float& nxStart, float& nyStart, float& nxEnd, float& nyEnd) const;
