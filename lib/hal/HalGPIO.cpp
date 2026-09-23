@@ -271,7 +271,11 @@ void HalGPIO::waitForActivity(const unsigned long timeoutMs) {
 }
 
 unsigned long HalGPIO::nextInputServiceDelayMs(const unsigned long maxDelayMs) const {
-  return inputMgr.nextServiceDelayMs(maxDelayMs);
+  // The pinned upstream SDK does not expose input service deadlines (a CrossDiTo
+  // SDK extension), so bound the idle wait by live contact state only; the wake
+  // semaphore and the caller's heartbeat cap keep input latency bounded.
+  const bool contactActive = inputMgr.isTouchPressed() || inputMgr.getHeldTime() > 0;
+  return contactActive ? (maxDelayMs < 10 ? maxDelayMs : 10) : maxDelayMs;
 }
 
 bool HalGPIO::wasUsbStateChanged() const { return usbStateChanged; }
@@ -346,8 +350,6 @@ bool HalGPIO::isTouchTapCandidate(float& nx, float& ny, unsigned long& heldMs) c
 }
 
 bool HalGPIO::wasTouchLongPress(float& nx, float& ny) const { return inputMgr.wasTouchLongPress(nx, ny); }
-
-void HalGPIO::suppressTouchContact() { inputMgr.suppressTouchContact(); }
 
 bool HalGPIO::isTouchHeldAt(float& nx, float& ny) const { return inputMgr.isTouchHeldAt(nx, ny); }
 
