@@ -81,12 +81,6 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     TIME_LEFT_BOOK = 2,
     STATUS_BAR_TIME_LEFT_COUNT
   };
-  enum STATUS_BAR_PAGE_COUNT {
-    PAGE_COUNT_HIDE = 0,
-    PAGE_COUNT_CHAPTER = 1,
-    PAGE_COUNT_BOOK = 2,
-    STATUS_BAR_PAGE_COUNT_COUNT
-  };
   enum XTC_STATUS_BAR_MODE {
     XTC_STATUS_BAR_HIDE = 0,
     XTC_STATUS_BAR_BOTTOM = 1,
@@ -359,12 +353,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     PAGE_TURN_GESTURE_COUNT
   };
 
-  enum INDEXING_METHOD {
-    INDEXING_INCREMENTAL = 0,
-    INDEXING_FULL_SECTION = 1,
-    INDEXING_FULL_BOOK = 2,
-    INDEXING_METHOD_COUNT
-  };
+  enum INDEXING_METHOD { INDEXING_INCREMENTAL = 0, INDEXING_FULL_SECTION = 1, INDEXING_METHOD_COUNT };
 
   enum TILT_PAGE_TURN { TILT_OFF = 0, TILT_ON = 1, TILT_PAGE_TURN_COUNT };
   enum TILT_PAGE_TURN_DIRECTION {
@@ -434,9 +423,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t sleepScreenCoverFilter = NO_FILTER;
   // Status bar settings (statusBar retained for migration only)
   uint8_t statusBar = FULL;
-  // Persisted under the legacy statusBarChapterPageCount key. Values now select
-  // hidden, chapter-relative, or exact laid-out whole-book page numbers.
-  uint8_t statusBarChapterPageCount = PAGE_COUNT_CHAPTER;
+  uint8_t statusBarChapterPageCount = 1;
   uint8_t statusBarBookProgressPercentage = 1;
   uint8_t statusBarBookPercentageFormat = BOOK_PERCENTAGE_WHOLE;
   uint8_t stablePageNumbers = 0;
@@ -725,7 +712,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   bool fromJson(JsonVariantConst doc, bool importingCrossPoint = false);
 
   struct StatusBarSpec {
-    uint8_t pageCountMode = PAGE_COUNT_HIDE;
+    bool showChapterPageCount = false;
     bool showBookProgressPercent = false;
     bool showStablePageNumbers = false;
     uint8_t titleMode = HIDE_TITLE;
@@ -738,8 +725,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     uint8_t xtcMode = XTC_STATUS_BAR_HIDE;
 
     bool textLaneVisible(bool clockAvailable) const {
-      return pageCountMode != PAGE_COUNT_HIDE || showBookProgressPercent || showStablePageNumbers ||
-             titleMode != HIDE_TITLE ||
+      return showChapterPageCount || showBookProgressPercent || showStablePageNumbers || titleMode != HIDE_TITLE ||
              timeLeftMode != TIME_LEFT_HIDE || showBattery || (showClock && clockAvailable);
     }
     bool showsProgressBar() const { return progressBarMode != HIDE_PROGRESS; }

@@ -3,6 +3,7 @@
 #include <BoardConfig.h>
 #include <CrossInkHalFrontlight.h>
 #include <HalClock.h>
+#include <HalGPIO.h>
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Logging.h>
@@ -17,7 +18,6 @@
 #include <mutex>
 #include <string>
 
-#include "AppVersion.h"
 #include "I18nKeys.h"
 #include "QuickActions.h"
 #include "SettingsList.h"
@@ -818,7 +818,7 @@ bool CrossPointSettings::loadFromFile() {
     return JsonLoadStatus::MissingOrEmpty;
   };
 
-  // Prefer CrossDiTo's legacy-namespaced settings file. Use the old generic file only
+  // Prefer CrossInk's namespaced settings file. Use the old generic file only
   // as a migration fallback so other firmware can keep its own settings.json.
   JsonLoadStatus jsonStatus = loadJsonSettings(SETTINGS_FILE_JSON, false);
   if (jsonStatus != JsonLoadStatus::MissingOrEmpty) return jsonStatus == JsonLoadStatus::Loaded;
@@ -982,9 +982,7 @@ bool CrossPointSettings::loadFromBinaryFile() {
 
 CrossPointSettings::StatusBarSpec CrossPointSettings::statusBarSpec() const {
   StatusBarSpec spec;
-  spec.pageCountMode = statusBarChapterPageCount < STATUS_BAR_PAGE_COUNT_COUNT
-                           ? statusBarChapterPageCount
-                           : static_cast<uint8_t>(PAGE_COUNT_CHAPTER);
+  spec.showChapterPageCount = statusBarChapterPageCount != 0;
   spec.showBookProgressPercent = statusBarBookProgressPercentage != 0;
   spec.showStablePageNumbers = stablePageNumbers != 0;
   spec.titleMode = statusBarTitle;
