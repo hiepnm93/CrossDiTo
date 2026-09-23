@@ -95,7 +95,6 @@ class TxtReaderActivity final : public Activity {
     pagesUntilFullRefresh = -1;
     return true;
   }
-  unsigned long nextLoopWakeDelayMs() const override { return 1000UL; }
   bool isReaderActivity() const override { return true; }
   bool usesFullScreenReaderVerticalSwipes() const override {
 #if defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY
