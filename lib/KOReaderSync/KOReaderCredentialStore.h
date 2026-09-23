@@ -35,7 +35,6 @@ class KOReaderCredentialStore : public PersistableStore<KOReaderCredentialStore>
   KOReaderSyncBehavior syncBehavior = KOReaderSyncBehavior::SMART;
   mutable std::atomic<uint8_t> loadState{0};  // 0=not loaded, 1=loading, 2=ready
   bool loadSucceeded = false;
-  void ensureLoaded() const;
 
   // Private constructor for singleton
   KOReaderCredentialStore() = default;
@@ -52,6 +51,7 @@ class KOReaderCredentialStore : public PersistableStore<KOReaderCredentialStore>
 
   // Credential management
   void setCredentials(const std::string& user, const std::string& pass);
+  void ensureLoaded() const;
   const std::string& getUsername() const;
   const std::string& getPassword() const;
 
