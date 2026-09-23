@@ -18,8 +18,13 @@ The native build uses `sdl2-config`, so SDL2 must be installed and available in 
 brew install sdl2
 
 # Linux (Debian/Ubuntu)
-sudo apt install libsdl2-dev
+sudo apt install libsdl2-dev libssl-dev
+
+# Linux (Fedora)
+sudo dnf install SDL2-devel openssl-devel
 ```
+
+Linux builds also need PlatformIO in `PATH`; `MD5Builder_linux.h` links against OpenSSL (wired up by `scripts/sim_native_host_compat.py`).
 
 ## Setup
 
