@@ -288,11 +288,12 @@ void CompanionActivity::render(RenderLock&&) {
                                 EpdFontFamily::BOLD);
     }
     renderer.drawCenteredText(UI_12_FONT_ID, screen.y + screen.height / 3, tr(STR_COMPANION_ADVERTISING), true);
-    renderer.drawCenteredText(UI_10_FONT_ID, screen.y + screen.height / 3 + 30, companion::COMPANION_DEVICE_NAME,
-                              false);
+    char nameBuf[40];
+    snprintf(nameBuf, sizeof(nameBuf), "%s v%s", companion::COMPANION_DEVICE_NAME, companion::COMPANION_VERSION);
+    renderer.drawCenteredText(UI_10_FONT_ID, screen.y + screen.height / 3 + 30, nameBuf, true);
     // Shown so the phone side can match this exact reader by BLE address.
     renderer.drawCenteredText(SMALL_FONT_ID, screen.y + screen.height / 3 + 58, companion::CompanionService::address(),
-                              false);
+                              true);
   } else {
     // --- Weather layout -------------------------------------------------
     const int contentTop = y;
@@ -342,13 +343,15 @@ void CompanionActivity::render(RenderLock&&) {
       char timeBuf[10];
       if (halClock.formatTime(timeBuf, sizeof(timeBuf), SETTINGS.clockUtcOffsetQ, SETTINGS.clockFormat == 1)) {
         snprintf(valueBuf, sizeof(valueBuf), "%s %s", tr(STR_WEATHER_UPDATED), timeBuf);
-        renderer.drawCenteredText(UI_10_FONT_ID, rowY, valueBuf, false);
+        renderer.drawCenteredText(UI_10_FONT_ID, rowY, valueBuf, true);
       }
     }
     rowY += rowStep;
-    renderer.drawCenteredText(UI_10_FONT_ID, rowY + metrics.verticalSpacing,
-                              connected ? tr(STR_COMPANION_CONNECTED) : tr(STR_COMPANION_DISCONNECTED),
-                              connected);
+    char statusBuf[48];
+    snprintf(statusBuf, sizeof(statusBuf), "%s v%s",
+             connected ? tr(STR_COMPANION_CONNECTED) : tr(STR_COMPANION_DISCONNECTED),
+             companion::COMPANION_VERSION);
+    renderer.drawCenteredText(UI_10_FONT_ID, rowY + metrics.verticalSpacing, statusBuf, true);
   }
 
   const auto labels = mappedInput.mapLabels(mappedInput.withBackArrow(tr(STR_BACK)), "", "", "");

@@ -13,6 +13,11 @@ namespace companion {
 
 constexpr const char* COMPANION_DEVICE_NAME = "CrossDiTo-X4";
 
+// Test-build version, shown on the companion screen so the running firmware
+// can be matched to the released tag (companion-test-<version>). Bump this
+// with every companion-test release.
+constexpr const char* COMPANION_VERSION = "0.5";
+
 class CompanionService {
  public:
   // Bring up the NimBLE stack and start advertising. Returns false when the
