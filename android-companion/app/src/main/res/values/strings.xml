@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CrossDiTo Companion</string>
+    <string name="connect">Connect</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="weather_title">Weather</string>
+    <string name="location">Location</string>
+    <string name="temperature">Temperature (°C)</string>
+    <string name="feels_like">Feels like (°C)</string>
+    <string name="temp_min">Min (°C)</string>
+    <string name="temp_max">Max (°C)</string>
+    <string name="humidity">Humidity (%)</string>
+    <string name="condition">Condition</string>
+    <string name="send">Send to X4</string>
+    <string name="fetch_weather">Fetch weather (Open-Meteo)</string>
+    <string name="waiting">Waiting for weather…</string>
+</resources>
