@@ -18,6 +18,7 @@ import android.os.Looper
 import android.util.Log
 import com.crossdito.companion.protocol.CompanionProtocol
 import java.util.UUID
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * GATT client for the X4 Pro companion service. All public methods must be
@@ -26,7 +27,7 @@ import java.util.UUID
  *
  * Wire protocol and UUIDs: docs/companion-protocol.md.
  */
-class BleClient(context: Context, private val listener: Listener) {
+class BleClient(context: Context) {
 
     interface Listener {
         fun onStateChanged(state: ConnectionState, message: String)
@@ -41,13 +42,17 @@ class BleClient(context: Context, private val listener: Listener) {
         private const val SCAN_TIMEOUT_MS = 15_000L
         private const val CONNECT_TIMEOUT_MS = 15_000L
         private const val CHUNK_PACING_MS = 30L
+        private const val PREFS = "companion"
+        private const val KEY_LAST_ADDRESS = "last_address"
         private val CCC_DESCRIPTOR_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     }
 
     private val context = context.applicationContext
+    private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val mainHandler = Handler(Looper.getMainLooper())
     private val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     private val adapter: BluetoothAdapter? get() = bluetoothManager.adapter
+    private val listeners = CopyOnWriteArrayList<Listener>()
 
     var state: ConnectionState = ConnectionState.Disconnected
         private set
@@ -63,7 +68,15 @@ class BleClient(context: Context, private val listener: Listener) {
 
     private fun setState(newState: ConnectionState, message: String) {
         state = newState
-        listener.onStateChanged(newState, message)
+        listeners.forEach { it.onStateChanged(newState, message) }
+    }
+
+    fun addListener(listener: Listener) {
+        listeners.add(listener)
+    }
+
+    fun removeListener(listener: Listener) {
+        listeners.remove(listener)
     }
 
     fun isBluetoothEnabled(): Boolean = adapter?.isEnabled == true
@@ -105,10 +118,15 @@ class BleClient(context: Context, private val listener: Listener) {
         mainHandler.postDelayed({
             if (state == ConnectionState.Scanning) {
                 stopScanInternal()
-                setState(
-                    ConnectionState.Error,
-                    "X4 not found. The reader stops advertising while another device (nRF Connect, Windows…) holds a connection — close those, and confirm the reader shows \"Waiting for phone…\".",
-                )
+                // Nothing seen: the reader may not be advertising because
+                // the phone stack (or another app) already holds the link.
+                // Try the last known address before giving up.
+                if (!connectAddress(prefs.getString(KEY_LAST_ADDRESS, null))) {
+                    setState(
+                        ConnectionState.Error,
+                        "X4 not found. The reader stops advertising while another device (nRF Connect, Windows…) holds a connection — close those, and confirm the reader shows \"Waiting for phone…\".",
+                    )
+                }
             }
         }, SCAN_TIMEOUT_MS)
     }
@@ -121,6 +139,7 @@ class BleClient(context: Context, private val listener: Listener) {
             val isX4 = name == DEVICE_NAME || advertisedUuids.any { it.uuid == SERVICE_UUID }
             if (!isX4) return
             stopScanInternal()
+            prefs.edit().putString(KEY_LAST_ADDRESS, result.device.address).apply()
             connect(result.device, "Found $DEVICE_NAME (${result.device.address}) — connecting…")
         }
 
@@ -154,6 +173,27 @@ class BleClient(context: Context, private val listener: Listener) {
     }
 
     // --- Connection ----------------------------------------------------------
+
+    /**
+     * Direct GATT connect to the MAC shown on the reader's Phone Companion
+     * screen. Works even when the reader is not advertising (e.g. the phone
+     * stack already holds the ACL for another app) because the stack shares
+     * one link between GATT clients.
+     */
+    @SuppressLint("MissingPermission")
+    fun connectAddress(address: String?): Boolean {
+        if (address.isNullOrEmpty()) return false
+        if (state != ConnectionState.Disconnected && state != ConnectionState.Error) return false
+        val ble = adapter ?: return false
+        val device = try {
+            ble.getRemoteDevice(address)
+        } catch (e: IllegalArgumentException) {
+            null
+        } ?: return false
+        prefs.edit().putString(KEY_LAST_ADDRESS, address).apply()
+        connect(device, "Connecting to saved X4 ($address)…")
+        return true
+    }
 
     @SuppressLint("MissingPermission")
     private fun connect(device: BluetoothDevice, foundMessage: String) {
@@ -315,7 +355,7 @@ class BleClient(context: Context, private val listener: Listener) {
                 if (g !== gatt || characteristic.uuid != STATUS_CHAR_UUID) return@post
                 if (value.size >= 3 && value[2].toInt() != 0) {
                     Log.w(TAG, "X4 reported protocol error ${value[2]}")
-                    listener.onStateChanged(state, "X4 rejected last packet (error ${value[2]})")
+                    setState(state, "X4 rejected last packet (error ${value[2]})")
                 }
             }
         }
@@ -450,5 +490,18 @@ class BleClient(context: Context, private val listener: Listener) {
         } catch (e: SecurityException) {
             Log.w(TAG, "close failed", e)
         }
+    }
+}
+
+/**
+ * Process-wide shared client so MainActivity and AutoSendService drive the
+ * same GATT connection instead of racing for the single link the X4 accepts.
+ */
+object BleHolder {
+    lateinit var client: BleClient
+        private set
+
+    fun init(context: Context) {
+        if (!::client.isInitialized) client = BleClient(context)
     }
 }
