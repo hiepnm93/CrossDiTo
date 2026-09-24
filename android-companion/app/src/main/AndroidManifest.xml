@@ -18,11 +18,19 @@
 
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
+    <!-- Required for the Open-Meteo weather fetch and Sentry crash reports. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:allowBackup="true"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.Companion">
+
+        <!-- Sentry crash reporting; the SDK auto-initializes from this. -->
+        <meta-data
+            android:name="io.sentry.dsn"
+            android:value="https://66736e7c951b5ea28212e9457fd09da9@o4511115174019072.ingest.us.sentry.io/4512140317949952" />
         <activity
             android:name=".MainActivity"
             android:exported="true">

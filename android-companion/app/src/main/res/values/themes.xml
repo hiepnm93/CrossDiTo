@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Companion" parent="@android:style/Theme.DeviceDefault.Light.DarkActionBar" />
+    <!-- AppCompatActivity requires an AppCompat theme; a platform
+         DeviceDefault theme crashes the activity in onCreate. -->
+    <style name="Theme.Companion" parent="@style/Theme.AppCompat.Light.DarkActionBar" />
 </resources>
