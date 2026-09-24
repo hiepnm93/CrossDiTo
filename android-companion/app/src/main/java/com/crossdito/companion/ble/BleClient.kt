@@ -93,7 +93,9 @@ class BleClient(context: Context, private val listener: Listener) {
             // unreliable on several phone stacks because the UUID lands in the
             // scan response. Match by name/UUID in code instead.
             scanner.startScan(null, ScanSettings.Builder()
-                .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
+                // LOW_LATENCY: BALANCED duty-cycles the radio and some OEM
+                // stacks deliver unfiltered results slowly or not at all.
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
                 .build(), scanCallback)
         } catch (e: Exception) {
             Log.e(TAG, "startScan failed", e)
@@ -105,7 +107,7 @@ class BleClient(context: Context, private val listener: Listener) {
                 stopScanInternal()
                 setState(
                     ConnectionState.Error,
-                    "X4 not found. Is the reader showing \"Waiting for phone…\" on its Phone Companion screen?",
+                    "X4 not found. The reader stops advertising while another device (nRF Connect, Windows…) holds a connection — close those, and confirm the reader shows \"Waiting for phone…\".",
                 )
             }
         }, SCAN_TIMEOUT_MS)
