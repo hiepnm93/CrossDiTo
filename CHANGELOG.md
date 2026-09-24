@@ -5,6 +5,11 @@
 - Phone Companion (experimental): open Home → Phone Companion on the X4 Pro and the reader briefly becomes a BLE peripheral (`CrossDiTo-X4`) that an Android companion app can push data to. Weather is the first supported data type, sent as compact binary frames (versioned protocol, no JSON on the radio); the weather screen uses procedural e-ink glyphs and refreshes only when data or connection state changes. BLE is fully powered off when the screen closes, and the reader stays offline. See `docs/companion-protocol.md`.
 - Android companion app under `android-companion/`: BLE scan/connect with an explicit connection state machine, REQUIRED manual weather form for Internet-free testing, and optional key-free automatic weather via Open-Meteo. Location permission is never required.
 
+### Fixed
+
+- Companion app scan now uses low-latency scanning so phones with aggressive BLE stacks reliably see the reader, and the scan-timeout message explains that the reader stops advertising while another Bluetooth app (nRF Connect, Windows) holds a connection.
+- Companion app no longer draws under the transparent status bar on Android 15 (targetSdk 35 edge-to-edge enforcement), which put the signal/battery icons on top of the app title.
+
 ## [v1.5.2] - 2026-09-24
 
 CrossDiTo 1.5.2 rebases the fork onto **CrossInk 1.6.0**. All upstream 1.5.1 and 1.6.0 fixes and features are inherited; CrossDiTo-specific behavior is re-verified against the new base.

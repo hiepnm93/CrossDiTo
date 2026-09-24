@@ -2,5 +2,12 @@
 <resources>
     <!-- AppCompatActivity requires an AppCompat theme; a platform
          DeviceDefault theme crashes the activity in onCreate. -->
-    <style name="Theme.Companion" parent="@style/Theme.AppCompat.Light.DarkActionBar" />
+    <!-- windowOptOutEdgeToEdgeEnforcement: targetSdk 35 makes Android 15
+         draw the app behind the transparent status bar, putting the
+         signal/battery icons on top of the action bar title. Opting out
+         restores the classic laid-out-below-the-status-bar behavior.
+         Deprecated in API 36 — migrate to inset handling if targetSdk 36+. -->
+    <style name="Theme.Companion" parent="@style/Theme.AppCompat.Light.DarkActionBar">
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+    </style>
 </resources>
