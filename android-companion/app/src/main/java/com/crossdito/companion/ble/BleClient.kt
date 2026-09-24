@@ -240,12 +240,52 @@ class BleClient(context: Context, private val listener: Listener) {
                 if (g !== gatt) return@post
                 operationPending = false
                 if (status == BluetoothGatt.GATT_SUCCESS) {
+                    // Read STATUS once: echoes the reader's protocol version.
+                    val sc = statusCharacteristic
+                    if (sc != null) {
+                        operationPending = true
+                        if (g.readCharacteristic(sc)) return@post
+                        operationPending = false
+                    }
                     setState(ConnectionState.Ready, "Connected to X4")
                 } else {
                     closeGattQuietly()
                     setState(ConnectionState.Error, "Could not enable status notifications")
                 }
             }
+        }
+
+        @SuppressLint("MissingPermission")
+        override fun onCharacteristicRead(
+            g: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            status: Int,
+        ) {
+            mainHandler.post {
+                if (g !== gatt || characteristic.uuid != STATUS_CHAR_UUID) return@post
+                @Suppress("DEPRECATION")
+                val value = characteristic.value ?: ByteArray(0)
+                handleStatusRead(value)
+            }
+        }
+
+        override fun onCharacteristicRead(
+            g: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            value: ByteArray,
+            status: Int,
+        ) {
+            mainHandler.post {
+                if (g !== gatt || characteristic.uuid != STATUS_CHAR_UUID) return@post
+                handleStatusRead(value)
+            }
+        }
+
+        private fun handleStatusRead(value: ByteArray) {
+            operationPending = false
+            if (state == ConnectionState.Ready || state == ConnectionState.Error) return
+            val protocolVersion = if (value.isNotEmpty()) value[0].toInt() else 0
+            setState(ConnectionState.Ready, "Connected to X4 — reader protocol v$protocolVersion")
         }
 
         @SuppressLint("MissingPermission")

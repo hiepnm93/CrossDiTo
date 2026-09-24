@@ -45,6 +45,14 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        // App version in the title bar; the reader shows its matching
+        // companion version on the Phone Companion screen.
+        val appVersion = try {
+            packageManager.getPackageInfo(packageName, 0).versionName
+        } catch (e: Exception) {
+            "?"
+        }
+        title = "CrossDiTo Companion v$appVersion"
 
         statusText = findViewById(R.id.statusText)
         fetchStatus = findViewById(R.id.fetchStatus)

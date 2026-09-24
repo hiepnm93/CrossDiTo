@@ -146,11 +146,13 @@ bool CompanionService::start() {
 
   NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
   advertising->addServiceUUID(SERVICE_UUID);
-  advertising->setName(COMPANION_DEVICE_NAME);
-  // The 128-bit UUID (18 bytes) plus flags fill most of the 31-byte ADV
-  // payload, so the 12-char name only fits in the scan response — which is
-  // disabled by default in NimBLE 2.x and must be enabled explicitly.
+  // Order matters: scan response must be enabled BEFORE setName(). The
+  // 128-bit UUID (18 bytes) plus flags fill most of the 31-byte ADV payload,
+  // and setName() only routes into the scan response when it is already
+  // enabled — otherwise it writes into the full ADV payload, fails, and the
+  // name is silently dropped.
   advertising->enableScanResponse(true);
+  advertising->setName(COMPANION_DEVICE_NAME);
   if (!advertising->start()) {
     LOG_ERR(LOG_TAG, "advertising failed to start");
     NimBLEDevice::deinit();
