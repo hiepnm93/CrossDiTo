@@ -23,6 +23,10 @@ class CompanionService {
   // while reading.
   static void stop();
 
+  // The local BLE MAC as "AA:BB:CC:DD:EE:FF" (empty before start()). Shown on
+  // the companion screen so the phone can match the device by address.
+  static const char* address();
+
   static bool isRunning() { return running_; }
 
  private:

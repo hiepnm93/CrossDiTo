@@ -10,11 +10,14 @@ namespace companion {
 bool CompanionService::running_ = false;
 bool CompanionService::start() { return false; }
 void CompanionService::stop() {}
+const char* CompanionService::address() { return ""; }
 }  // namespace companion
 
 #else
 
 #include <NimBLEDevice.h>
+
+#include <cstdio>
 
 namespace companion {
 
@@ -106,6 +109,13 @@ DataCharCallbacks dataCharCallbacks;
 
 bool CompanionService::running_ = false;
 
+namespace {
+// Backing store for address(); filled once per start().
+char g_address[18] = {};
+}  // namespace
+
+const char* CompanionService::address() { return g_address; }
+
 bool CompanionService::start() {
   if (running_) return true;
 
@@ -113,6 +123,8 @@ bool CompanionService::start() {
     LOG_ERR(LOG_TAG, "NimBLE init failed");
     return false;
   }
+  snprintf(g_address, sizeof(g_address), "%s", NimBLEDevice::getAddress().toString().c_str());
+  LOG_INF(LOG_TAG, "BLE address %s", g_address);
 
   NimBLEServer* server = NimBLEDevice::createServer();
   server->setCallbacks(&serverCallbacks, false);

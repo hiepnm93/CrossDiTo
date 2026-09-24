@@ -290,6 +290,9 @@ void CompanionActivity::render(RenderLock&&) {
     renderer.drawCenteredText(UI_12_FONT_ID, screen.y + screen.height / 3, tr(STR_COMPANION_ADVERTISING), true);
     renderer.drawCenteredText(UI_10_FONT_ID, screen.y + screen.height / 3 + 30, companion::COMPANION_DEVICE_NAME,
                               false);
+    // Shown so the phone side can match this exact reader by BLE address.
+    renderer.drawCenteredText(SMALL_FONT_ID, screen.y + screen.height / 3 + 58, companion::CompanionService::address(),
+                              false);
   } else {
     // --- Weather layout -------------------------------------------------
     const int contentTop = y;

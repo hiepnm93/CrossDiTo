@@ -119,7 +119,7 @@ class BleClient(context: Context, private val listener: Listener) {
             val isX4 = name == DEVICE_NAME || advertisedUuids.any { it.uuid == SERVICE_UUID }
             if (!isX4) return
             stopScanInternal()
-            connect(result.device)
+            connect(result.device, "Found $DEVICE_NAME (${result.device.address}) — connecting…")
         }
 
         override fun onScanFailed(errorCode: Int) {
@@ -154,9 +154,9 @@ class BleClient(context: Context, private val listener: Listener) {
     // --- Connection ----------------------------------------------------------
 
     @SuppressLint("MissingPermission")
-    private fun connect(device: BluetoothDevice) {
+    private fun connect(device: BluetoothDevice, foundMessage: String) {
         timedOut = false
-        setState(ConnectionState.Connecting, "Connecting…")
+        setState(ConnectionState.Connecting, foundMessage)
         gatt = try {
             if (android.os.Build.VERSION.SDK_INT >= 23) {
                 device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
