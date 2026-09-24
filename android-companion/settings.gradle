@@ -5,6 +5,10 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+plugins {
+    // Lets Gradle auto-download a JDK toolchain (this machine only has a JRE).
+    id "org.gradle.toolchains.foojay-resolver-convention" version "0.8.0"
+}
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
