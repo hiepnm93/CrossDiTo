@@ -10,7 +10,6 @@ import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
-import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
@@ -87,17 +86,15 @@ class BleClient(context: Context, private val listener: Listener) {
             return
         }
 
-        val filter = ScanFilter.Builder().setServiceUuid(
-            android.os.ParcelUuid(SERVICE_UUID),
-        ).build()
-        val settings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
-            .build()
-
         timedOut = false
         setState(ConnectionState.Scanning, "Scanning for $DEVICE_NAME…")
         try {
-            scanner.startScan(listOf(filter), settings, scanCallback)
+            // Deliberately unfiltered: 128-bit service UUID ScanFilters are
+            // unreliable on several phone stacks because the UUID lands in the
+            // scan response. Match by name/UUID in code instead.
+            scanner.startScan(null, ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
+                .build(), scanCallback)
         } catch (e: Exception) {
             Log.e(TAG, "startScan failed", e)
             setState(ConnectionState.Error, "Scan failed to start: ${e.message}")
@@ -106,7 +103,10 @@ class BleClient(context: Context, private val listener: Listener) {
         mainHandler.postDelayed({
             if (state == ConnectionState.Scanning) {
                 stopScanInternal()
-                setState(ConnectionState.Error, "X4 Pro not found (scanning timed out)")
+                setState(
+                    ConnectionState.Error,
+                    "X4 not found. Is the reader showing \"Waiting for phone…\" on its Phone Companion screen?",
+                )
             }
         }, SCAN_TIMEOUT_MS)
     }
@@ -114,13 +114,25 @@ class BleClient(context: Context, private val listener: Listener) {
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             if (state != ConnectionState.Scanning) return
+            val advertisedUuids = result.scanRecord?.serviceUuids.orEmpty()
+            val name = result.scanRecord?.deviceName ?: result.device?.name
+            val isX4 = name == DEVICE_NAME || advertisedUuids.any { it.uuid == SERVICE_UUID }
+            if (!isX4) return
             stopScanInternal()
             connect(result.device)
         }
 
         override fun onScanFailed(errorCode: Int) {
             if (state != ConnectionState.Scanning) return
-            setState(ConnectionState.Error, "Scan failed (code $errorCode)")
+            val reason = when (errorCode) {
+                1 -> "already started"
+                2 -> "Bluetooth off"
+                3 -> "internal error"
+                4 -> "feature unsupported"
+                5 -> "app registration lost"
+                else -> "unknown"
+            }
+            setState(ConnectionState.Error, "Scan failed ($reason)")
         }
     }
 

@@ -95,6 +95,16 @@ class MainActivity : AppCompatActivity() {
         ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
     }
 
+    private fun isLocationServiceOn(): Boolean {
+        val lm = getSystemService(LOCATION_SERVICE) as android.location.LocationManager
+        return try {
+            lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) ||
+                lm.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+        } catch (e: Exception) {
+            true // do not block scanning if providers cannot be queried
+        }
+    }
+
     private fun onConnectPressed() {
         if (bleClient.isConnected() || bleClient.state == ConnectionState.Connecting ||
             bleClient.state == ConnectionState.DiscoveringServices
@@ -113,6 +123,12 @@ class MainActivity : AppCompatActivity() {
             }
             !hasAllPermissions() -> {
                 ActivityCompat.requestPermissions(this, requiredPermissions().toTypedArray(), REQUEST_BLE_PERMS)
+            }
+            Build.VERSION.SDK_INT < 31 && !isLocationServiceOn() -> {
+                // Pre-Android-12 stacks report BLE scan results only with
+                // location services enabled; without it the scan simply
+                // returns nothing.
+                statusText.text = "Turn location (GPS) on in quick settings — Android ≤11 needs it for BLE scanning"
             }
             else -> bleClient.startScan()
         }
