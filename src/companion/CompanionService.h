@@ -1,0 +1,32 @@
+#pragma once
+
+#include "CompanionProtocol.h"
+#include "CompanionState.h"
+
+// BLE lifecycle for the Phone Companion feature. The X4 Pro is a BLE
+// peripheral / GATT server advertising as "CrossDiTo-X4"; the phone app is
+// central / GATT client. The service only exists while the companion screen
+// is open: start() from onEnter(), stop() from onExit().
+//
+// Wire protocol and UUIDs: docs/companion-protocol.md
+namespace companion {
+
+constexpr const char* COMPANION_DEVICE_NAME = "CrossDiTo-X4";
+
+class CompanionService {
+ public:
+  // Bring up the NimBLE stack and start advertising. Returns false when the
+  // stack could not start (logged); state reports the failure via lastError.
+  static bool start();
+
+  // Disconnect, stop advertising and tear the stack down so the radio is off
+  // while reading.
+  static void stop();
+
+  static bool isRunning() { return running_; }
+
+ private:
+  static bool running_;
+};
+
+}  // namespace companion

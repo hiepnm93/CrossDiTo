@@ -115,6 +115,7 @@ class ActivityManager {
   void goToUsbDrive();
   bool resumeFileTransferFromNetworkBoot(uint32_t payload);
   void goToNearbyStatsSync();
+void goToCompanion();
   bool goToNearbyBookSend(std::string path, bool returnToReader);
   void goToNearbyBookReceive();
   void goToSettings(bool dismissOnUpSwipe = false);

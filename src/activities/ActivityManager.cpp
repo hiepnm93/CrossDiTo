@@ -28,6 +28,7 @@
 #include "home/RecentBooksActivity.h"
 #include "home/RecentBooksGridActivity.h"
 #include "network/CrossPointWebServerActivity.h"
+#include "network/CompanionActivity.h"
 #include "network/NearbyBookTransferActivity.h"
 #include "network/NearbyStatsSyncActivity.h"
 #include "network/UsbDriveActivity.h"
@@ -656,6 +657,10 @@ bool ActivityManager::resumeFileTransferFromNetworkBoot(const uint32_t payload) 
 
 void ActivityManager::goToNearbyStatsSync() {
   replaceActivity(std::make_unique<NearbyStatsSyncActivity>(renderer, mappedInput));
+}
+
+void ActivityManager::goToCompanion() {
+  replaceActivity(std::make_unique<CompanionActivity>(renderer, mappedInput));
 }
 
 void ActivityManager::goToSettings(const bool dismissOnUpSwipe) {
