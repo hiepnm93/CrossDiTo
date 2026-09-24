@@ -217,7 +217,9 @@ class MainActivity : AppCompatActivity() {
     // --- Sending -------------------------------------------------------------
 
     private fun readDouble(field: EditText, name: String): Double =
-        field.text.toString().trim().toDoubleOrNull() ?: throw IllegalArgumentException("$name is not a number")
+        // Keyboards on comma-decimal locales (vi, de, fr…) submit "27,5".
+        field.text.toString().trim().replace(',', '.').toDoubleOrNull()
+            ?: throw IllegalArgumentException("$name is not a number")
 
     private fun buildManualProvider(): ManualWeatherProvider {
         val humidity = humidityField.text.toString().trim().toIntOrNull()
@@ -285,7 +287,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun formatTenths(deciC: Int): String =
-        if (deciC % 10 == 0) (deciC / 10).toString() else String.format("%.1f", deciC / 10.0)
+        // Locale.US so the field never renders "27,5", which readDouble
+        // would still accept but keeps the value copy-paste stable.
+        if (deciC % 10 == 0) (deciC / 10).toString() else String.format(java.util.Locale.US, "%.1f", deciC / 10.0)
 
     override fun onPause() {
         super.onPause()
