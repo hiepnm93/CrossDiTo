@@ -15,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.crossdito.companion.ble.BleClient
+import com.crossdito.companion.ble.BleHolder
 import com.crossdito.companion.ble.ConnectionState
 import com.crossdito.companion.protocol.CompanionProtocol
 import com.crossdito.companion.protocol.WeatherCondition
@@ -26,6 +27,14 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val REQUEST_BLE_PERMS = 1
         private const val REQUEST_ENABLE_BT = 2
+        private const val REQUEST_NOTIF_PERMS = 3
+        private const val PREFS = "companion"
+    }
+
+    private val stateListener = object : BleClient.Listener {
+        override fun onStateChanged(state: ConnectionState, message: String) {
+            runOnUiThread { renderState(state, message) }
+        }
     }
 
     private lateinit var bleClient: BleClient
@@ -34,6 +43,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var connectButton: Button
     private lateinit var sendButton: Button
     private lateinit var fetchButton: Button
+    private lateinit var autoSendCheck: android.widget.CheckBox
     private lateinit var locationField: EditText
     private lateinit var temperatureField: EditText
     private lateinit var feelsLikeField: EditText
@@ -59,6 +69,7 @@ class MainActivity : AppCompatActivity() {
         connectButton = findViewById(R.id.connectButton)
         sendButton = findViewById(R.id.sendButton)
         fetchButton = findViewById(R.id.fetchButton)
+        autoSendCheck = findViewById(R.id.autoSendCheck)
         locationField = findViewById(R.id.locationField)
         temperatureField = findViewById(R.id.temperatureField)
         feelsLikeField = findViewById(R.id.feelsLikeField)
@@ -74,16 +85,39 @@ class MainActivity : AppCompatActivity() {
         )
         conditionSpinner.setSelection(WeatherCondition.CLOUDY.value)
 
-        bleClient = BleClient(applicationContext, object : BleClient.Listener {
-            override fun onStateChanged(state: ConnectionState, message: String) {
-                runOnUiThread { renderState(state, message) }
+        BleHolder.init(applicationContext)
+        bleClient = BleHolder.client
+        bleClient.addListener(stateListener)
+
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        autoSendCheck.isChecked = prefs.getBoolean("auto_send", false)
+        autoSendCheck.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean("auto_send", checked).apply()
+            if (checked) {
+                requestNotifPermissionIfNeeded()
+                AutoSendService.start(this)
+            } else {
+                AutoSendService.stop(this)
             }
-        })
+        }
+        if (autoSendCheck.isChecked) AutoSendService.start(this)
 
         connectButton.setOnClickListener { onConnectPressed() }
         sendButton.setOnClickListener { onSendPressed() }
         fetchButton.setOnClickListener { onFetchPressed() }
         renderState(ConnectionState.Disconnected, getString(R.string.status_disconnected))
+    }
+
+    private fun requestNotifPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < 33) return
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        ActivityCompat.requestPermissions(
+            this, arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), REQUEST_NOTIF_PERMS,
+        )
     }
 
     // --- Connection ----------------------------------------------------------
@@ -253,9 +287,19 @@ class MainActivity : AppCompatActivity() {
     private fun formatTenths(deciC: Int): String =
         if (deciC % 10 == 0) (deciC / 10).toString() else String.format("%.1f", deciC / 10.0)
 
-    @SuppressLint("MissingPermission")
+    override fun onPause() {
+        super.onPause()
+        // The auto-send service reads the city from prefs every minute.
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+            .putString("city", locationField.text.toString().trim())
+            .apply()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
-        bleClient.disconnect()
+        bleClient.removeListener(stateListener)
+        // Keep the link alive when the auto-send service owns it; the
+        // service drops it in its own onDestroy.
+        if (!AutoSendService.running) bleClient.disconnect()
     }
 }

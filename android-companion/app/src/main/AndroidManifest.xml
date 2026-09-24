@@ -21,6 +21,11 @@
     <!-- Required for the Open-Meteo weather fetch and Sentry crash reports. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Auto-send foreground service (every-minute weather push). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:allowBackup="true"
         android:label="@string/app_name"
@@ -39,6 +44,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".AutoSendService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
     </application>
 
 </manifest>

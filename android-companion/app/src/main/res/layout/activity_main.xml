@@ -96,6 +96,12 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
+        <CheckBox
+            android:id="@+id/autoSendCheck"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/auto_send" />
+
         <Button
             android:id="@+id/sendButton"
             android:layout_width="match_parent"
