@@ -116,6 +116,18 @@ See [Installation](./docs/installation.md) for step-by-step flashing and revert 
 
 Visit [https://www.crossink.dev](https://www.crossink.dev) for more user guides and additional documentation.
 
+### Phone Companion (experimental)
+
+An Android app can push weather (manual values or [Open-Meteo](https://open-meteo.com) data) to the X4 Pro over Bluetooth LE. BLE runs **only** while the Phone Companion screen is open; normal reading is unaffected.
+
+1. On the X4 Pro, open **Home → Phone Companion**. The reader advertises as `CrossDiTo-X4` and waits.
+2. Install the companion APK (`android-companion/app/build/outputs/apk/debug/app-debug.apk`, or the APK attached to the release) on your phone and open it.
+3. Grant the Bluetooth permissions, then tap **Connect** and pick the X4 Pro when it appears.
+4. Type test weather into the form (location, temperatures, humidity, condition) or tap **Fetch weather** to pull it from Open-Meteo, then tap **Send to X4**.
+5. The weather appears on the X4 Pro's screen. Press Back on the reader to close Phone Companion and switch BLE off again.
+
+Protocol details and limits: [docs/companion-protocol.md](./docs/companion-protocol.md). Current limitations: weather only (calendar, notifications, battery and custom text are reserved message types), the snapshot lives only while the screen is open, and the manual mode is intended for testing.
+
 ---
 
 ## Development quick start
@@ -163,6 +175,7 @@ See [Testing and Debugging](./docs/development/testing-debugging.md) for serial 
 - `lib/` - supporting libraries: EPUB parsing/layout, fonts, i18n, filesystem helpers, HAL wrappers, and more
 - `freeink-sdk/` - the exact vendored hardware SDK snapshot used by the verified X4 Pro release; it contains display, input, storage, frontlight, and battery support
 - `web/` - web portal sources (`templates/`, `pages/`, `assets/`); compiled by `scripts/build_web.py` into `src/network/html/*.generated.h`
+- `android-companion/` - the optional Android BLE companion app (Kotlin; `./gradlew assembleDebug`)
 - `docs/` - user and developer documentation, published via the `site/` Astro site
 - `site/` - Astro project that builds `docs/` into the CrossDiTo documentation website
 - `test/` - unit tests and EPUB test fixtures
