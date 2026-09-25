@@ -16,4 +16,9 @@
     <string name="fetch_weather">Fetch weather (Open-Meteo)</string>
     <string name="waiting">Waiting for weather…</string>
     <string name="auto_send">Auto-send weather every minute</string>
+    <string name="tab_reader">Reader</string>
+    <string name="tab_weather">Weather</string>
+    <string name="sync_log">Sync log</string>
+    <string name="sync_log_empty">No sync yet</string>
+    <string name="no_reader_paired">No reader paired yet</string>
 </resources>

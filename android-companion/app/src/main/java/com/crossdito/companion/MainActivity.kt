@@ -5,9 +5,11 @@ import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.RadioGroup
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
@@ -34,11 +36,20 @@ class MainActivity : AppCompatActivity() {
     private val stateListener = object : BleClient.Listener {
         override fun onStateChanged(state: ConnectionState, message: String) {
             runOnUiThread { renderState(state, message) }
+            when (state) {
+                ConnectionState.Ready, ConnectionState.Disconnected, ConnectionState.Error ->
+                    SyncLog.add(message)
+                else -> {}
+            }
         }
     }
 
+    private val syncLogListener = { refreshSyncLog() }
+
     private lateinit var bleClient: BleClient
     private lateinit var statusText: TextView
+    private lateinit var readerAddressText: TextView
+    private lateinit var syncLogView: TextView
     private lateinit var fetchStatus: TextView
     private lateinit var connectButton: Button
     private lateinit var sendButton: Button
@@ -65,6 +76,8 @@ class MainActivity : AppCompatActivity() {
         title = "CrossDiTo Companion v$appVersion"
 
         statusText = findViewById(R.id.statusText)
+        readerAddressText = findViewById(R.id.readerAddressText)
+        syncLogView = findViewById(R.id.syncLogView)
         fetchStatus = findViewById(R.id.fetchStatus)
         connectButton = findViewById(R.id.connectButton)
         sendButton = findViewById(R.id.sendButton)
@@ -102,10 +115,22 @@ class MainActivity : AppCompatActivity() {
         }
         if (autoSendCheck.isChecked) AutoSendService.start(this)
 
+        findViewById<RadioGroup>(R.id.tabBar).setOnCheckedChangeListener { _, checkedId ->
+            val reader = checkedId == R.id.tabReader
+            findViewById<View>(R.id.pageReader).visibility = if (reader) View.VISIBLE else View.GONE
+            findViewById<View>(R.id.pageWeather).visibility = if (reader) View.GONE else View.VISIBLE
+        }
+
         connectButton.setOnClickListener { onConnectPressed() }
         sendButton.setOnClickListener { onSendPressed() }
         fetchButton.setOnClickListener { onFetchPressed() }
+        SyncLog.addListener(syncLogListener)
+        refreshSyncLog()
         renderState(ConnectionState.Disconnected, getString(R.string.status_disconnected))
+    }
+
+    private fun refreshSyncLog() {
+        syncLogView.text = SyncLog.text().ifEmpty { getString(R.string.sync_log_empty) }
     }
 
     private fun requestNotifPermissionIfNeeded() {
@@ -200,6 +225,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderState(state: ConnectionState, message: String) {
         statusText.text = message
+        readerAddressText.text =
+            getSharedPreferences(PREFS, MODE_PRIVATE).getString("last_address", null)
+                ?: getString(R.string.no_reader_paired)
         connectButton.setText(
             if (state == ConnectionState.Ready || state == ConnectionState.Sending ||
                 state == ConnectionState.Connecting || state == ConnectionState.DiscoveringServices ||
@@ -243,6 +271,7 @@ class MainActivity : AppCompatActivity() {
             bleClient.sendFrame(frame) { ok, message ->
                 runOnUiThread {
                     Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                    SyncLog.add(if (ok) "✓ manual send OK" else "✗ $message")
                     if (!ok) renderState(ConnectionState.Error, message)
                 }
             }
@@ -302,6 +331,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         bleClient.removeListener(stateListener)
+        SyncLog.removeListener(syncLogListener)
         // Keep the link alive when the auto-send service owns it; the
         // service drops it in its own onDestroy.
         if (!AutoSendService.running) bleClient.disconnect()

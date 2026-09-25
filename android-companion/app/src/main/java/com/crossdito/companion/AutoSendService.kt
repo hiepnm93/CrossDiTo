@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.PowerManager
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -48,6 +49,7 @@ class AutoSendService : Service() {
     }
 
     private val handler = Handler(Looper.getMainLooper())
+    private var wakeLock: PowerManager.WakeLock? = null
     private val client get() = BleHolder.client
 
     private val stateListener = object : BleClient.Listener {
@@ -81,6 +83,11 @@ class AutoSendService : Service() {
         } else {
             startForeground(NOTIF_ID, notif)
         }
+        // Doze throttles postDelayed to ~15-min batches; the minute cadence
+        // is the whole feature, so hold a CPU lock for the service lifetime.
+        wakeLock = getSystemService(PowerManager::class.java)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "crossdito:autosend")
+            .apply { acquire(24 * 3_600_000L) }  // safety cap: one day
         handler.post(tick)
     }
 
@@ -105,11 +112,14 @@ class AutoSendService : Service() {
                 handler.post {
                     if (!running) return@post
                     client.sendFrame(CompanionProtocol.encodeWeatherFrame(weather)) { ok, msg ->
-                        updateNotif(if (ok) "Auto-send: sent \"$city\"" else "Auto-send failed: $msg")
+                        val line = if (ok) "✓ sent \"$city\"" else "✗ send failed: $msg"
+                        SyncLog.add(line)
+                        updateNotif("Auto-send: $line")
                     }
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "weather fetch failed", e)
+                SyncLog.add("✗ fetch \"$city\": ${e.message}")
                 handler.post { if (running) updateNotif("Auto-send: fetch failed (${e.message})") }
             }
         }.start()
@@ -137,6 +147,8 @@ class AutoSendService : Service() {
     override fun onDestroy() {
         running = false
         handler.removeCallbacks(tick)
+        wakeLock?.let { if (it.isHeld) it.release() }
+        wakeLock = null
         client.removeListener(stateListener)
         // Auto-send off (or service killed): drop the link so the X4
         // advertises again for the next session.
