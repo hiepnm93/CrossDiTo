@@ -110,10 +110,13 @@ offset  size  field
 10      8     timestamp      uint64, observation time as Unix epoch seconds
 18      1     locationLen    uint8, 0..31
 19      N     location       UTF-8 bytes, exactly locationLen bytes
+19+N    0..1  wind           uint8, km/h at 10 m; senders SHOULD append it,
+              receivers accept both lengths (0 means unknown)
 ```
 
-Total payload length must be exactly `19 + locationLen` bytes; the maximum
-payload is 50 bytes.
+Total payload length must be exactly `19 + locationLen` bytes (legacy, wind
+unknown) or `20 + locationLen` bytes (with wind); the maximum payload is
+51 bytes. Senders built after the wind addition always append the byte.
 
 ### Conditions
 
@@ -135,7 +138,7 @@ The receiver never trusts the payload:
 
 - `condition` above `8` → error `5`, frame dropped
 - declared length larger than 480 → error `4`
-- payload length not equal to `19 + locationLen` → error `5`
+- payload length not equal to `19 + locationLen` or `20 + locationLen` → error `5`
 - location longer than 31 bytes → truncated at the nearest UTF-8 character
   boundary, then accepted
 - location that is not valid UTF-8 (truncated sequences, bad continuation
@@ -152,17 +155,18 @@ freshness.
 ## Example
 
 Weather for Hanoi, 27.0 °C (feels 29.0), min 24.0, max 30.0, 76 % humidity,
-condition `CLOUDY`, observation epoch `1789986000`:
+12 km/h wind, condition `CLOUDY`, observation epoch `1789986000`:
 
 ```
-frame:   01 01 00 18 02 01 0E 01 22 00 F0 01 2C 4C
-         00 00 00 00 6A B1 04 D0 05 48 61 6E 6F 69
+frame:   01 01 00 19 02 01 0E 01 22 00 F0 01 2C 4C
+         00 00 00 00 6A B1 04 D0 05 48 61 6E 6F 69 0C
 ```
 
-Walkthrough: header `01 01 00 18` = version 1, type `0x01` (WEATHER),
-payload length `0x0018` = 24. Payload starts `02` (`CLOUDY`), temperature
+Walkthrough: header `01 01 00 19` = version 1, type `0x01` (WEATHER),
+payload length `0x0019` = 25. Payload starts `02` (`CLOUDY`), temperature
 `01 0E` = 270 = 27.0 °C, humidity `4C` = 76, timestamp `6A B1 04 D0` =
-`1789986000`, `locationLen` `05`, followed by `Hanoi`. Round-trip vectors
+`1789986000`, `locationLen` `05`, followed by `Hanoi`, then wind `0C` =
+12 km/h. Round-trip vectors
 live in `test/companion_protocol/CompanionProtocolTest.cpp` and
 `android-companion/app/src/test/.../CompanionProtocolEncoderTest.kt`, and
 both suites must keep passing against this document.

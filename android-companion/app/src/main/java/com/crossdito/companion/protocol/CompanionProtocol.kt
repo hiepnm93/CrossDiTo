@@ -44,7 +44,7 @@ object CompanionProtocol {
         val locationBytes = truncateUtf8(data.location, WEATHER_LOCATION_MAX_BYTES)
         require(locationBytes.decodeToString().length >= 0) // UTF-8 was validated by decodeToString
 
-        val out = ByteArrayOutputStream(19 + locationBytes.size)
+        val out = ByteArrayOutputStream(20 + locationBytes.size)
         out.write(data.condition.value)
         writeU16(out, data.temperatureDeciC)
         writeU16(out, data.feelsLikeDeciC)
@@ -54,6 +54,9 @@ object CompanionProtocol {
         writeU64(out, data.timestamp)
         out.write(locationBytes.size)
         out.write(locationBytes)
+        // Trailing wind byte (docs/companion-protocol.md); readers also accept
+        // the legacy payload without it.
+        out.write(data.windKph.coerceIn(0, 255))
         return out.toByteArray()
     }
 

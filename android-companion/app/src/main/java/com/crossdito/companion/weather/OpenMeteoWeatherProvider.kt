@@ -34,7 +34,7 @@ class OpenMeteoWeatherProvider(
 
         val body = urlOpener(
             "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
-                "&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code" +
+                "&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code" +
                 "&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1",
         )
         val forecast = JSONObject(body)
@@ -48,6 +48,7 @@ class OpenMeteoWeatherProvider(
             tempMaxDeciC = Math.round(daily.getJSONArray("temperature_2m_max").getDouble(0) * 10).toInt(),
             tempMinDeciC = Math.round(daily.getJSONArray("temperature_2m_min").getDouble(0) * 10).toInt(),
             humidity = current.optInt("relative_humidity_2m", 0).coerceIn(0, 100),
+            windKph = Math.round(current.optDouble("wind_speed_10m", 0.0)).toInt().coerceIn(0, 255),
             timestamp = System.currentTimeMillis() / 1000,
             location = resolvedName,
         )

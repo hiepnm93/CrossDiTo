@@ -19,6 +19,7 @@ WeatherData sampleWeather() {
   w.tempMinDeciC = 240;
   w.tempMaxDeciC = 300;
   w.humidity = 76;
+  w.windKph = 12;
   w.timestamp = 1789987200u;
   strcpy(w.location, "Hanoi");
   w.locationLen = 5;
@@ -41,6 +42,7 @@ TEST(CompanionProtocol, WeatherRoundTripMatchesOriginal) {
   EXPECT_EQ(decoded.tempMinDeciC, original.tempMinDeciC);
   EXPECT_EQ(decoded.tempMaxDeciC, original.tempMaxDeciC);
   EXPECT_EQ(decoded.humidity, original.humidity);
+  EXPECT_EQ(decoded.windKph, original.windKph);
   EXPECT_EQ(decoded.timestamp, original.timestamp);
   EXPECT_EQ(decoded.locationLen, original.locationLen);
   EXPECT_STREQ(decoded.location, "Hanoi");
@@ -137,7 +139,7 @@ TEST(CompanionProtocol, PayloadLengthMismatchIsBadPayload) {
   const WeatherData original = sampleWeather();
   std::vector<uint8_t> payload(WEATHER_PAYLOAD_MAX_BYTES);
   const size_t payloadLen = encodeWeather(original, payload.data(), payload.size());
-  // Declare a longer payload than the location field accounts for.
+  // Declare a longer payload than location plus the trailing wind byte account for.
   std::vector<uint8_t> frame(MAX_FRAME_BYTES);
   const size_t frameLen = encodeFrame(MessageType::WEATHER, payload.data(), payloadLen + 1, frame.data(),
                                       frame.size());
@@ -146,6 +148,20 @@ TEST(CompanionProtocol, PayloadLengthMismatchIsBadPayload) {
   WeatherData decoded;
   EXPECT_EQ(decodeWeather(frame.data() + FRAME_HEADER_BYTES, frameLen - FRAME_HEADER_BYTES, decoded),
             ParseError::BAD_PAYLOAD);
+}
+
+TEST(CompanionProtocol, LegacyFormWithoutWindByteDecodes) {
+  // companion-test-0.1 senders stop after the location; wind must default to 0.
+  uint8_t payload[WEATHER_PAYLOAD_MIN_BYTES + 5] = {};
+  payload[0] = static_cast<uint8_t>(WeatherCondition::CLEAR);
+  payload[9] = 63;
+  payload[18] = 5;
+  memcpy(payload + WEATHER_PAYLOAD_MIN_BYTES, "Hanoi", 5);
+
+  WeatherData decoded;
+  ASSERT_EQ(decodeWeather(payload, sizeof(payload), decoded), ParseError::NONE);
+  EXPECT_EQ(decoded.windKph, 0);
+  EXPECT_STREQ(decoded.location, "Hanoi");
 }
 
 TEST(CompanionProtocol, InvalidConditionEnumIsRejected) {

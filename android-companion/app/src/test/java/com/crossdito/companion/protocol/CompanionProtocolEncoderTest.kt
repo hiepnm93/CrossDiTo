@@ -18,6 +18,7 @@ class CompanionProtocolEncoderTest {
         tempMinDeciC = 240,
         tempMaxDeciC = 300,
         humidity = 76,
+        windKph = 12,
         timestamp = 1789986000L,
         location = "Hanoi",
     )
@@ -26,10 +27,10 @@ class CompanionProtocolEncoderTest {
     fun encodesDocumentedExampleBytes() {
         val frame = CompanionProtocol.encodeWeatherFrame(sample())
         val expected = (
-            listOf(0x01, 0x01, 0x00, 0x18) + listOf(
+            listOf(0x01, 0x01, 0x00, 0x19) + listOf(
                 0x02, 0x01, 0x0E, 0x01, 0x22, 0x00, 0xF0, 0x01, 0x2C, 0x4C,
                 0x00, 0x00, 0x00, 0x00, 0x6A, 0xB1, 0x04, 0xD0, 0x05,
-            ) + "Hanoi".toByteArray(Charsets.US_ASCII).map { it.toInt() and 0xFF }
+            ) + "Hanoi".toByteArray(Charsets.US_ASCII).map { it.toInt() and 0xFF } + 0x0C
             ).map { it.toByte() }.toByteArray()
         org.junit.Assert.assertArrayEquals(expected, frame)
     }
@@ -41,7 +42,7 @@ class CompanionProtocolEncoderTest {
         assertEquals(CompanionProtocol.TYPE_WEATHER, frame[1].toInt())
         val payloadLen = ((frame[2].toInt() and 0xFF) shl 8) or (frame[3].toInt() and 0xFF)
         assertEquals(frame.size - CompanionProtocol.FRAME_HEADER_BYTES, payloadLen)
-        assertEquals(24, payloadLen)
+        assertEquals(25, payloadLen)
     }
 
     @Test

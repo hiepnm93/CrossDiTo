@@ -195,7 +195,10 @@ ParseError decodeWeather(const uint8_t* payload, size_t length, WeatherData& out
     return ParseError::BAD_PAYLOAD;
   }
   const uint8_t locationLen = payload[18];
-  if (length != WEATHER_PAYLOAD_MIN_BYTES + locationLen) {
+  // Newer senders append a wind byte after the location; the legacy 19+N form
+  // (companion-test-0.1) is still accepted with windKph = 0.
+  const bool hasWind = length == WEATHER_PAYLOAD_MIN_BYTES + locationLen + 1;
+  if (!hasWind && length != WEATHER_PAYLOAD_MIN_BYTES + locationLen) {
     return ParseError::BAD_PAYLOAD;
   }
   const char* location = reinterpret_cast<const char*>(payload + WEATHER_PAYLOAD_MIN_BYTES);
@@ -221,6 +224,9 @@ ParseError decodeWeather(const uint8_t* payload, size_t length, WeatherData& out
   data.tempMaxDeciC = static_cast<int16_t>(getU16(payload + 7));
   data.humidity = payload[9] > 100 ? 100 : payload[9];
   data.timestamp = getU32(payload + 10);
+  if (hasWind) {
+    data.windKph = payload[WEATHER_PAYLOAD_MIN_BYTES + locationLen];
+  }
   memcpy(data.location, location, useLen);
   data.location[useLen] = '\0';
   data.locationLen = useLen;
@@ -252,7 +258,8 @@ size_t encodeWeather(const WeatherData& in, uint8_t* out, size_t outCap) {
   putU32(out + 10, in.timestamp);
   out[18] = locationLen;
   memcpy(out + WEATHER_PAYLOAD_MIN_BYTES, in.location, locationLen);
-  return WEATHER_PAYLOAD_MIN_BYTES + locationLen;
+  out[WEATHER_PAYLOAD_MIN_BYTES + locationLen] = in.windKph;
+  return WEATHER_PAYLOAD_MIN_BYTES + 1 + locationLen;
 }
 
 size_t encodeFrame(MessageType type, const uint8_t* payload, size_t payloadLen, uint8_t* out, size_t outCap) {

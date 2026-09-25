@@ -160,27 +160,16 @@ void drawWeatherGlyph(GfxRenderer& renderer, const Rect& box, companion::Weather
   }
 }
 
-const char* conditionString(companion::WeatherCondition condition) {
+// Plain-language sunshine summary derived from the condition; shown under
+// RealFeel instead of the raw condition name.
+const char* commentString(companion::WeatherCondition condition) {
   switch (condition) {
     case companion::WeatherCondition::CLEAR:
-      return tr(STR_WEATHER_CLEAR);
+      return tr(STR_WEATHER_COMMENT_SUNNY);
     case companion::WeatherCondition::PARTLY_CLOUDY:
-      return tr(STR_WEATHER_PARTLY_CLOUDY);
-    case companion::WeatherCondition::CLOUDY:
-      return tr(STR_WEATHER_CLOUDY);
-    case companion::WeatherCondition::RAIN:
-      return tr(STR_WEATHER_RAIN);
-    case companion::WeatherCondition::HEAVY_RAIN:
-      return tr(STR_WEATHER_HEAVY_RAIN);
-    case companion::WeatherCondition::THUNDERSTORM:
-      return tr(STR_WEATHER_THUNDERSTORM);
-    case companion::WeatherCondition::SNOW:
-      return tr(STR_WEATHER_SNOW);
-    case companion::WeatherCondition::FOG:
-      return tr(STR_WEATHER_FOG);
-    case companion::WeatherCondition::UNKNOWN:
+      return tr(STR_WEATHER_COMMENT_LITTLE_SUN);
     default:
-      return tr(STR_WEATHER_UNKNOWN);
+      return tr(STR_WEATHER_COMMENT_NO_SUN);
   }
 }
 
@@ -296,37 +285,51 @@ void CompanionActivity::render(RenderLock&&) {
                               true);
   } else {
     // --- Weather layout -------------------------------------------------
+    // Icon left; temperature, RealFeel and the sunshine comment to its right;
+    // then the detail rows label-left / value-right.
     const int contentTop = y;
-    const int centerX = screen.x + screen.width / 2;
 
-    // Icon left of the big temperature.
-    Rect glyphBox{screen.x + screen.width / 8, contentTop + metrics.verticalSpacing, screen.width / 4,
-                  screen.height / 4};
+    Rect glyphBox{screen.x + metrics.contentSidePadding, contentTop, screen.width / 4, screen.height / 4};
     drawWeatherGlyph(renderer, glyphBox, weather.condition);
 
-    char tempBuf[12];
-    formatDeciC(tempBuf, sizeof(tempBuf), weather.temperatureDeciC);
-    renderer.drawCenteredText(BITTER_16_FONT_ID, glyphBox.y + glyphBox.height / 2, tempBuf, true,
-                              EpdFontFamily::BOLD);
+    const int textX = glyphBox.x + glyphBox.width + metrics.contentSidePadding * 2;
 
-    renderer.drawCenteredText(UI_12_FONT_ID, glyphBox.y + glyphBox.height + metrics.verticalSpacing,
-                              conditionString(weather.condition), true, EpdFontFamily::BOLD);
+    char tempNum[16];
+    formatDeciC(tempNum, sizeof(tempNum), weather.temperatureDeciC);
+    char tempBuf[20];
+    snprintf(tempBuf, sizeof(tempBuf), "%s C", tempNum);
+    renderer.drawText(BITTER_16_FONT_ID, textX, glyphBox.y + metrics.verticalSpacing, tempBuf, true,
+                      EpdFontFamily::BOLD);
 
-    char locationBuf[sizeof(weather.location) + 8];
-    snprintf(locationBuf, sizeof(locationBuf), "%.*s", static_cast<int>(weather.locationLen), weather.location);
-    renderer.drawCenteredText(UI_12_FONT_ID, glyphBox.y + glyphBox.height + metrics.verticalSpacing + 28,
-                              locationBuf, true);
+    char feelBuf[16];
+    formatDeciC(feelBuf, sizeof(feelBuf), weather.feelsLikeDeciC);
+    char feelLine[40];
+    snprintf(feelLine, sizeof(feelLine), "%s %s C", tr(STR_WEATHER_REALFEEL), feelBuf);
+    renderer.drawText(UI_10_FONT_ID, textX, glyphBox.y + 48, feelLine, true);
 
-    // Humidity and high/low rows, label left / value right.
-    int rowY = glyphBox.y + glyphBox.height + metrics.verticalSpacing * 3 + 24;
+    renderer.drawText(UI_12_FONT_ID, textX, glyphBox.y + 80, commentString(weather.condition), true,
+                      EpdFontFamily::BOLD);
+
+    int rowY = glyphBox.y + glyphBox.height + metrics.verticalSpacing * 2;
     const int labelX = screen.x + metrics.contentSidePadding;
     const int valueX = screen.x + screen.width - metrics.contentSidePadding;
     const int rowStep = 30;
+    char valueBuf[40];
 
-    char valueBuf[32];
+    char locationBuf[sizeof(weather.location) + 8];
+    snprintf(locationBuf, sizeof(locationBuf), "%.*s", static_cast<int>(weather.locationLen), weather.location);
+    renderer.drawText(UI_12_FONT_ID, labelX, rowY, tr(STR_WEATHER_LOCATION), true);
+    renderer.drawText(UI_12_FONT_ID, valueX - renderer.getTextWidth(UI_12_FONT_ID, locationBuf), rowY, locationBuf,
+                      true);
 
+    rowY += rowStep;
     snprintf(valueBuf, sizeof(valueBuf), "%u%%", weather.humidity);
     renderer.drawText(UI_12_FONT_ID, labelX, rowY, tr(STR_WEATHER_HUMIDITY), true);
+    renderer.drawText(UI_12_FONT_ID, valueX - renderer.getTextWidth(UI_12_FONT_ID, valueBuf), rowY, valueBuf, true);
+
+    rowY += rowStep;
+    snprintf(valueBuf, sizeof(valueBuf), "%u km/h", weather.windKph);
+    renderer.drawText(UI_12_FONT_ID, labelX, rowY, tr(STR_WEATHER_WIND), true);
     renderer.drawText(UI_12_FONT_ID, valueX - renderer.getTextWidth(UI_12_FONT_ID, valueBuf), rowY, valueBuf, true);
 
     rowY += rowStep;
@@ -346,12 +349,11 @@ void CompanionActivity::render(RenderLock&&) {
         renderer.drawCenteredText(UI_10_FONT_ID, rowY, valueBuf, true);
       }
     }
-    rowY += rowStep;
     char statusBuf[48];
     snprintf(statusBuf, sizeof(statusBuf), "%s v%s",
              connected ? tr(STR_COMPANION_CONNECTED) : tr(STR_COMPANION_DISCONNECTED),
              companion::COMPANION_VERSION);
-    renderer.drawCenteredText(UI_10_FONT_ID, rowY + metrics.verticalSpacing, statusBuf, true);
+    renderer.drawCenteredText(UI_10_FONT_ID, rowY + rowStep, statusBuf, true);
   }
 
   const auto labels = mappedInput.mapLabels(mappedInput.withBackArrow(tr(STR_BACK)), "", "", "");

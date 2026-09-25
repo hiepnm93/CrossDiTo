@@ -6,6 +6,11 @@
 - Android companion app under `android-companion/`: BLE scan/connect with an explicit connection state machine, REQUIRED manual weather form for Internet-free testing, and optional key-free automatic weather via Open-Meteo. Location permission is never required.
 - Companion app auto-send: a foreground service toggled from the app that keeps the reader connected and pushes the current Open-Meteo weather once a minute. When scanning finds nothing (reader not advertising because the phone stack or another app holds the link), the app falls back to a direct connect using the reader's BLE address.
 
+### Changed
+
+- Phone Companion weather screen: retitled to "Current weather" (Vietnamese: "Thời tiết hiện tại") with a new layout — condition icon beside a large temperature, RealFeel and a sunshine summary ("Nhiều nắng / Ít nắng / Không có nắng") underneath, then location, humidity, wind, high/low, and update-time rows. Wind speed now travels in the WEATHER payload as an optional trailing byte; older senders without it still decode (see `docs/companion-protocol.md`).
+- Companion app bumped to 0.9 (companion-test release; reader status line now reports the same version).
+
 ### Fixed
 
 - Companion app scan now uses low-latency scanning so phones with aggressive BLE stacks reliably see the reader, and the scan-timeout message explains that the reader stops advertising while another Bluetooth app (nRF Connect, Windows) holds a connection.

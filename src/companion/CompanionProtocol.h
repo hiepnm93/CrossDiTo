@@ -59,6 +59,8 @@ struct WeatherData {
   int16_t tempMaxDeciC = 0;
   // 0-100 percent.
   uint8_t humidity = 0;
+  // Kilometres per hour at 10 m; 0 when the sender omitted it.
+  uint8_t windKph = 0;
   // Unix epoch seconds of the observation (display uses device-local receipt time).
   uint32_t timestamp = 0;
   // UTF-8 location, not NUL-terminated; use locationLen.
@@ -76,9 +78,10 @@ struct WeatherData {
 //  10  u64 observation epoch seconds
 //  18  u8  locationLen (0..WEATHER_LOCATION_MAX)
 //  19  ..  UTF-8 location bytes
+//  19+N  u8  wind km/h (optional trailing byte; readers accept both lengths)
 constexpr size_t WEATHER_PAYLOAD_MIN_BYTES = 19;
 constexpr size_t WEATHER_LOCATION_MAX = sizeof(WeatherData::location) - 1;
-constexpr size_t WEATHER_PAYLOAD_MAX_BYTES = WEATHER_PAYLOAD_MIN_BYTES + WEATHER_LOCATION_MAX;
+constexpr size_t WEATHER_PAYLOAD_MAX_BYTES = WEATHER_PAYLOAD_MIN_BYTES + 1 + WEATHER_LOCATION_MAX;
 
 // STATUS characteristic value reported back to the phone.
 struct StatusValue {

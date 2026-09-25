@@ -10,6 +10,8 @@ data class WeatherData(
     val tempMaxDeciC: Int = 0,
     /** 0..100 percent. */
     val humidity: Int = 0,
+    /** Wind speed in km/h; 0 means unknown. */
+    val windKph: Int = 0,
     /** Observation time as Unix epoch seconds. */
     val timestamp: Long = 0,
     /** UTF-8 display location, max 31 bytes after encoding. */
