@@ -16,7 +16,7 @@ constexpr const char* COMPANION_DEVICE_NAME = "CrossDiTo-X4";
 // Test-build version, shown on the companion screen so the running firmware
 // can be matched to the released tag (companion-test-<version>). Bump this
 // with every companion-test release.
-constexpr const char* COMPANION_VERSION = "0.6";
+constexpr const char* COMPANION_VERSION = "0.9";
 
 class CompanionService {
  public:
